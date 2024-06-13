@@ -9,8 +9,8 @@ class CsvCmp:
     def __init__(
             self, 
             input_dir_path: str,
-            data_save_dir_path: str = "./csvcmp-data/",
-        ) -> None:
+            data_save_dir_path: str = "./csvcmp-data/"
+        ):
         self.input_dir_path = input_dir_path
         self.data_save_dir_path = data_save_dir_path
 
@@ -35,23 +35,37 @@ class CsvCmp:
 
         left_names = [
             self._get_file_name(_) if type(_) == str 
-            else "df" + str(_.shape()) 
+            else "df_" + str(_.shape()) 
             for _ in left_input
         ]
         right_names = [
             self._get_file_name(_) if type(_) == str 
-            else "df" + str(_.shape()) 
+            else "df_" + str(_.shape()) 
             for _ in right_input
         ]
 
         left_dfs, right_dfs = self._change_inputs_to_dfs(
             left_input, 
             right_input=right_input,
-            use_input_dir_path=use_input_dir_path
+            use_input_dir_path=use_input_dir_path,
+            ignore_null_rows=ignore_null_rows,
         )
 
         def _only_in_format(name: str, df: pd.DataFrame) -> str:
             return f"Only in {name} {df.shape}:\n{df.head(20)}\n\n"
+        
+        def _get_left_and_right_only(left_df: pd.DataFrame, right_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+            columns = list(left_df.columns)
+            left_df_tmp = left_df.reset_index(names="_left_index")
+            right_df_tmp = right_df.reset_index(names="_right_index")
+            outer_df = pd.merge(left_df_tmp, right_df_tmp, how="outer", on=list(columns), indicator=True)
+
+            left_index_series = outer_df[outer_df["_merge"] == "left_only"]["_left_index"]
+            right_index_series = outer_df[outer_df["_merge"] == "right_only"]["_right_index"]
+            left_only_final = left_df.iloc[left_index_series]
+            right_only_final = right_df.iloc[right_index_series]
+
+            return left_only_final, right_only_final
 
         for left_df, right_df, left_name, right_name, i in zip(
             left_dfs, 
@@ -61,17 +75,11 @@ class CsvCmp:
             range(len(left_dfs))
         ):
             result_string += f"For index {i}\n\n"
-
-            if not ignore_null_rows:
-                left_df = left_df.fillna("NULL")
-                right_df = right_df.fillna("NULL")
             
+            # Assume that the columns of left_df and right_df are exactly the same.
             if match_rows:
                 left_value_counts = left_df.value_counts()
                 right_value_counts = right_df.value_counts()
-
-                left_only_index = left_value_counts.index.difference(right_value_counts.index)
-                right_only_index = right_value_counts.index.difference(left_value_counts.index)
 
                 shared = left_value_counts.index.intersection(right_value_counts.index)
 
@@ -80,30 +88,38 @@ class CsvCmp:
 
                 left_extra = shared_left_sub_right[shared_left_sub_right > 0]
                 right_extra = shared_right_sub_left[shared_right_sub_left > 0]
+                
+                left_to_add = []
+                for ind, count in list(pd.DataFrame(left_extra).itertuples(index=True)):
+                    left_to_add.append(left_df[left_df.isin(ind)].dropna().head(count))
 
-                left_only_final = pd.concat([left_value_counts[left_only_index], left_extra])
-                right_only_final = pd.concat([right_value_counts[right_only_index], right_extra])
+                right_to_add = []
+                for ind, count in list(pd.DataFrame(right_extra).itertuples(index=True)):
+                    right_to_add.append(right_df[right_df.isin(ind)].dropna().head(count))
 
-                left_only_final = left_only_final.sort_values(ascending=False).reset_index()
-                right_only_final = right_only_final.sort_values(ascending=False).reset_index()
+                left_only, right_only = _get_left_and_right_only(left_df, right_df)
+
+                left_only_final = pd.concat([left_only] + left_to_add).sort_index()
+                right_only_final = pd.concat([right_only] + right_to_add).sort_index()
+                print(right_only_final)
+                exit(1)
             else:
-                left_only_final = left_df[~left_df.isin(right_df)].dropna()
-                right_only_final = right_df[~right_df.isin(left_df)].dropna()
+                left_only_final, right_only_final = _get_left_and_right_only(left_df, right_df)
 
             result_string += _only_in_format(left_name, left_only_final)
             result_string += _only_in_format(right_name, right_only_final)
             
             result_string += "\n"
-            self._output_to_file(
-                file_sub_path=f"{self.compare_row_existence.__name__}/{left_name}_only.csv", 
-                df=left_only_final, 
-                data_save_dir_path=self.data_save_dir_path
-            )
-            self._output_to_file(
-                file_sub_path=f"{self.compare_row_existence.__name__}/{right_name}_only.csv", 
-                df=right_only_final, 
-                data_save_dir_path=self.data_save_dir_path
-            )
+            # self._output_to_file(
+            #     file_sub_path=f"{self.compare_row_existence.__name__}/{left_name}_only.csv", 
+            #     df=left_only_final, 
+            #     data_save_dir_path=self.data_save_dir_path
+            # )
+            # self._output_to_file(
+            #     file_sub_path=f"{self.compare_row_existence.__name__}/{right_name}_only.csv", 
+            #     df=right_only_final, 
+            #     data_save_dir_path=self.data_save_dir_path
+            # )
         print(result_string)
 
     def _get_function_info_string(
@@ -119,7 +135,10 @@ class CsvCmp:
         ) -> str:
         return file_path.split("/")[-1]
     
-    def _remove_file_extension(self, file_name: str) -> str:
+    def _remove_file_extension(
+            self, 
+            file_name: str
+        ) -> str:
         return file_name.split(".")[0]
       
     def _output_to_file(
@@ -147,6 +166,7 @@ class CsvCmp:
             self, 
             first_input: List[str | pd.DataFrame], 
             use_input_dir_path: bool,
+            ignore_null_rows: bool,
             **kwargs
         ) -> Tuple[List[pd.DataFrame], ...]:
         all_inputs = ([first_input] + [_ for _ in kwargs.values()]).copy()
@@ -164,8 +184,27 @@ class CsvCmp:
                     else:
                         raise ValueError(f"File type not supported: {val}")
                     
+                    if ignore_null_rows:
+                        input_[i] = input_[i].dropna()
+                    else:
+                        input_[i] = input_[i].fillna("NULL")
+                    
         return tuple(all_inputs)
+    
+    def _get_index_after_comparing(
+            self, 
+            left_df: pd.DataFrame, 
+            right_df: pd.DataFrame,
+            compare_func: callable,
+            left_transform_func: callable = lambda x: x,
+            right_transform_func: callable = lambda x: x,
+        ) -> pd.Index:
+        left_df = left_transform_func(left_df)
+        right_df = right_transform_func(right_df)
+        comp_res_df = compare_func(left_df, right_df)
+
+        return comp_res_df.index
     
 
 obj = CsvCmp("./test-data/testset-1/")
-obj.compare_row_existence(["test1.csv"], ["test2.csv"], match_rows=False)
+obj.compare_row_existence(["test1.csv"], ["test2.csv"], match_rows=True)
