@@ -1,20 +1,10 @@
-Column1,Column2,Column3,Column4,Column5
-Value1,Value2,Value3,Value4,Value5
-Value6,Value7,Value8,Value9,Value10
-Value11,Value12,Value13,Value14,Value15
-Value16,Value17,Value18,Value19,Value20
-Value21,Value22,Value23,Value24,Value25
-Value26,Value27,Value28,Value29,Value30
-Value31,Value32,Value33,Value34,Value35
-Value36,Value37,Value38,Value39,Value40
-Value41,Value42,Value43,Value44,Value45
-Value46,Value47,Value48,Value49,Value50
-Value51,Value52,Value53,Value54,Value55
-Value56,Value57,Value58,Value59,Value60
-Value61,Value62,Value63,Value64,Value65
-Value66,Value67,Value68,Value69,Value70
-Value46,Value47,Value48,Value49,Value50
-Value51,Value52,Value53,Value54,Value55
-Value56,Value57,Value58,Value59,Value60
-Value61,Value62,Value63,Value64,Value65
-Value66,Value67,Value68,Value69,Value70
+Name,Age,Email
+John Doe,25,johndoe@example.com
+Jane Smith,30,janesmith@example.com
+Alice Johnson,28,alicejohnson@example.com
+Michael Wilson,32,michaelwilson@example.com
+Michael Wilson,32,michaelwilson@example.com
+Bob Thompson,35,bobthompson@example.com
+Emily Davis,27,emilydavis@example.com
+Michael Wilson,32,michaelwilson@example.com
+Sarah Brown,29,sarahbrown@example.com
