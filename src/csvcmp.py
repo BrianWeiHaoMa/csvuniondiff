@@ -33,12 +33,46 @@ class CsvCmp:
         self.data_save_dir_path = data_save_dir_path
         self.enable_printing = enable_printing
 
+    def change_inputs_to_dfs(
+            self, 
+            first_input: list[str | pd.DataFrame], 
+            use_input_dir_path: bool,
+            drop_null_rows: bool,
+            input_dir_path_override: str = None,
+            **kwargs,
+        ) -> tuple[list[pd.DataFrame], ...]:
+        all_inputs = [first_input] + [input_ for input_ in kwargs.values()]
+
+        for input_ in all_inputs:
+            for i, val in enumerate(input_):
+                if type(val) == str:
+                    if use_input_dir_path:
+                        if input_dir_path_override is None:
+                            input_dir_path = self.input_dir_path
+                        else:
+                            input_dir_path = input_dir_path_override
+                        val = os.path.join(input_dir_path, val)
+
+                    if val.endswith(".csv"):
+                        input_[i] = pd.read_csv(val)    
+                    elif val.endswith(".xlsx"):
+                        input_[i] = pd.read_excel(val)
+                    else:
+                        raise ValueError(f"File type not supported: {val}")
+                    
+                    if drop_null_rows:
+                        input_[i] = input_[i].dropna()
+                    else:
+                        input_[i] = input_[i].fillna("NULL")
+                    
+        return tuple(all_inputs)
+
     def compare_row_existence(
             self, 
             left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
             right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-            left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] | None = None,
-            right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] | None = None,
+            left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
+            right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
             data_save_file_extensions: list[str] | None = None,
             ignore_null_rows: bool = False,
             match_rows: bool = True,
@@ -100,28 +134,22 @@ class CsvCmp:
                 raise ValueError("The number of elements in right_trans_funcs should be the same as the number of elements in right_input")
 
             left_file_names = [
-                self._get_file_name(input_) if type(input_) == str 
-                else f"df_{i}_{input_.shape}"
-                for i, input_ in enumerate(left_input)
+                self._get_file_name(input_) 
+                if type(input_) == str 
+                else f"df_{i}_{input_.shape}" for i, input_ in enumerate(left_input)
             ]
             right_file_names = [
-                self._get_file_name(input_) if type(input_) == str 
-                else f"df_{i}_{input_.shape}"
-                for i, input_ in enumerate(right_input)
+                self._get_file_name(input_) 
+                if type(input_) == str 
+                else f"df_{i}_{input_.shape}" for i, input_ in enumerate(right_input)
             ]
 
-            left_dfs, right_dfs = self._change_inputs_to_dfs(
+            left_dfs, right_dfs = self.change_inputs_to_dfs(
                 left_input, 
                 right_input=right_input,
                 use_input_dir_path=use_input_dir_path,
-                ignore_null_rows=ignore_null_rows,
+                drop_null_rows=ignore_null_rows,
             )
-
-            def _only_in_format(
-                    name: str, 
-                    df: pd.DataFrame,
-                ) -> str:
-                return f"Only in {name} {df.shape}:\n{df.head(20)}\n"
             
             def _get_left_and_right_only_ind(
                     left_df: pd.DataFrame, 
@@ -212,6 +240,12 @@ class CsvCmp:
                     left_only_final = left_df_trans.iloc[left_only_final_ind].sort_index()
                     right_only_final = right_df_trans.iloc[right_only_final_ind].sort_index()
 
+                def _only_in_format(
+                    name: str, 
+                    df: pd.DataFrame,
+                ) -> str:
+                    return f"Only in {name} {df.shape}:\n{df.head(20)}\n"
+
                 print(_only_in_format(left_file_name, left_only_final))
                 print(_only_in_format(right_file_name, right_only_final))
                 print()
@@ -281,6 +315,7 @@ class CsvCmp:
         df: pd.DataFrame,
     ) -> None:
         full_file_path = os.path.join(output_dir_path, file_name)
+
         print(f"Outputting to {full_file_path}")
         if full_file_path.endswith(".csv"):
             df.to_csv(full_file_path, index=False)
@@ -295,39 +330,8 @@ class CsvCmp:
             all_locals: dict,
         ) -> str:
         all_locals.pop("self")
+        for key, val in all_locals.items():
+            match type(val):
+                case 
+            all_locals[key] = str(val)
         return f"{func_name}()\n{json.dumps(all_locals, indent=4)}\n"
-    
-    def _remove_file_extension(
-            self, 
-            file_name: str,
-        ) -> str:
-        return file_name.split(".")[0]
-
-    def _change_inputs_to_dfs(
-            self, 
-            first_input: list[str | pd.DataFrame], 
-            use_input_dir_path: bool,
-            ignore_null_rows: bool,
-            **kwargs,
-        ) -> tuple[list[pd.DataFrame], ...]:
-        all_inputs = ([first_input] + [_ for _ in kwargs.values()]).copy()
-
-        for input_ in all_inputs:
-            for i, val in enumerate(input_):
-                if type(val) == str:
-                    if use_input_dir_path:
-                        val = os.path.join(self.input_dir_path, val)
-
-                    if val.endswith(".csv"):
-                        input_[i] = pd.read_csv(val)    
-                    elif val.endswith(".xlsx"):
-                        input_[i] = pd.read_excel(val)
-                    else:
-                        raise ValueError(f"File type not supported: {val}")
-                    
-                    if ignore_null_rows:
-                        input_[i] = input_[i].dropna()
-                    else:
-                        input_[i] = input_[i].fillna("NULL")
-                    
-        return tuple(all_inputs)
