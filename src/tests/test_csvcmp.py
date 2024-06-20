@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import pandas as pd
 
-from src.csvcmp import CsvCmp
+from src.csvcmp import CsvCmp, CommandOptions
 
 
 class CsvCmpTestCase(TestCase):
@@ -30,8 +30,8 @@ class CsvCmpTestCase(TestCase):
             right_xlsx="test2.xlsx",
         )
 
-    def test_compare_row_existence_match_true_false_transform_helper(self):
-        obj = CsvCmp("./src/tests/test-data/testset-2/")
+    def test_compare_row_existence_match_true_false_transform(self):
+        obj = CsvCmp("./src/tests/test-data/testset-2/", None)
 
         def left_df_trans(df: pd.DataFrame) -> pd.DataFrame:
             def email_trans(row):
@@ -42,11 +42,10 @@ class CsvCmpTestCase(TestCase):
             df.reindex(columns=["Name", "Email", "Age"])
             return df
 
-        left_dfs, right_dfs = obj.compare_row_existence(
+        left_dfs, right_dfs = obj.only_in(
             ["test1.csv"], 
             ["test2.csv"], 
-            match_rows=True, 
-            enable_printing=True,
+            CommandOptions(match_rows=True, enable_printing=True),
             left_trans_funcs=[left_df_trans],
             right_trans_funcs=[lambda x: x],
         )
@@ -75,8 +74,12 @@ class CsvCmpTestCase(TestCase):
             left_csv: str, 
             right_csv: str
         ):
-        obj = CsvCmp(input_dir)
-        left_dfs, right_dfs = obj.compare_row_existence([left_csv], [right_csv], match_rows=True, enable_printing=False)
+        obj = CsvCmp(input_dir, None)
+        left_dfs, right_dfs = obj.only_in(
+            [left_csv], 
+            [right_csv], 
+            CommandOptions(match_rows=True, enable_printing=False),
+        )
 
         left_df = left_dfs[0]
         right_df = right_dfs[0]
@@ -97,8 +100,12 @@ class CsvCmpTestCase(TestCase):
         self.assertEqual(right_df.equals(expected_right_df), True)
 
     def _test_compare_row_existence_match_rows_false_helper(self, input_dir: str, left_xlsx: str, right_xlsx: str):
-        obj = CsvCmp(input_dir)
-        left_dfs, right_dfs = obj.compare_row_existence([left_xlsx], [right_xlsx], match_rows=False, enable_printing=False)
+        obj = CsvCmp(input_dir, None)
+        left_dfs, right_dfs = obj.only_in(
+            [left_xlsx], 
+            [right_xlsx], 
+            CommandOptions(match_rows=False, enable_printing=False),
+        )
 
         left_df = left_dfs[0]
         right_df = right_dfs[0]

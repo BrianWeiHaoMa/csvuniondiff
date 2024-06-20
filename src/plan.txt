@@ -1,0 +1,15 @@
+csvcmp --only-in a.csv b.csv (--match-rows)
+csvcmp --intersection a.csv b.csv (--match-rows)
+csvcmp --in-any-of a.csv b.csv c.csv d.csv ... (checks if rows of a are in any of the ones after)
+
+
+global options:
+    --align-columns (t/f if column names are not aligned in csv, but both have same column names, realigns the column names to match)
+    --columns-to-use (only use these columns for comparison)
+    --fill-null (fills null with 'NULL' so that they can be compared)
+    --drop-null (drops rows with nulls)
+    --input-dir (use this dir as the base for the path to the files)
+    --output-dir (use this dir as the base for the outputs of the script)
+
+    --use-index (accounts for row position for comparison as well)
+    
