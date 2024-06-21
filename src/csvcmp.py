@@ -5,6 +5,7 @@ import sys
 import logging
 
 import pandas as pd
+import numpy as np
 
 
 class CommandOptions:
@@ -17,6 +18,7 @@ class CommandOptions:
             match_rows: bool | None = None,
             enable_printing: bool | None = None,
             add_save_timestamp: bool | None = None,
+            drop_duplicates: bool | None = None,
         ):
         self.align_columns = align_columns
         self.columns_to_use = columns_to_use
@@ -25,9 +27,13 @@ class CommandOptions:
         self.match_rows = match_rows
         self.enable_printing = enable_printing
         self.add_save_timestamp = add_save_timestamp
+        self.drop_duplicates = drop_duplicates
+
+    def __str__(self) -> str:
+        return str(self.__dict__)
 
 
-class ParallelInputParser:
+class ParallelInput:
     def __init__(
             self, 
             left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
@@ -143,7 +149,14 @@ class ParallelInputParser:
 
     def parse_input(
             self
-        ) -> tuple:        
+        ) -> tuple[
+            list[pd.DataFrame], list[pd.DataFrame], 
+            list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]], 
+            list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]], 
+            list[str], 
+            list[str], 
+            list[str]
+        ]:        
         left_names, right_names = self.get_names(
             self.left_input, 
             self.right_input,
@@ -200,7 +213,14 @@ class CsvCmp:
             command=self.only_in,
         )
 
-        parallel_input_parser = ParallelInputParser(
+        LOGGER.info(
+            self._get_function_info_string(
+                self.only_in.__name__, 
+                locals(),
+            )
+        )
+
+        parallel_input_parser = ParallelInput(
             left_input=left_input,
             right_input=right_input,
             input_dir=self.input_dir,
@@ -316,6 +336,10 @@ class CsvCmp:
                 df: pd.DataFrame,
             ) -> str:
                 return f"Only in {name} {df.shape}:\n{df.head(50)}\n"
+            
+            if options.drop_duplicates:
+                left_only_final = left_only_final.drop_duplicates(keep="first")
+                right_only_final = right_only_final.drop_duplicates(keep="first")
 
             LOGGER.info(_only_in_format(left_file_name, left_only_final))
             LOGGER.info(_only_in_format(right_file_name, right_only_final))
@@ -339,6 +363,148 @@ class CsvCmp:
             right_only_results.append(right_only_final)
         return left_only_results, right_only_results
     
+    def intersection(
+            self, 
+            left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+            right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+            options: CommandOptions = CommandOptions(),
+            left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
+            right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
+            data_save_file_extensions: list[str] | None = None,
+            use_input_dir_path: bool = True,
+            output_transformed_rows: bool = False,
+        ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
+        LOGGER, data_save_dir_path = self._setup(
+            options=options,
+            command=self.intersection,
+        )
+
+        LOGGER.info(
+            self._get_function_info_string(
+                self.intersection.__name__, 
+                locals(),
+            )
+        )
+
+        parallel_input_parser = ParallelInput(
+            left_input=left_input,
+            right_input=right_input,
+            input_dir=self.input_dir,
+            options=options,
+            left_trans_funcs=left_trans_funcs,
+            right_trans_funcs=right_trans_funcs,
+            data_save_file_extensions=data_save_file_extensions,
+            use_input_dir_path=use_input_dir_path,
+        )
+
+        (
+            left_dfs, 
+            right_dfs, 
+            left_trans_funcs,
+            right_trans_funcs,
+            left_file_names, 
+            right_file_names, 
+            data_save_file_extensions,
+        ) = parallel_input_parser.parse_input()
+
+        left_results = []
+        right_results = []
+
+        for i in range(len(left_dfs)):
+            left_df = left_dfs[i] 
+            right_df = right_dfs[i] 
+            left_trans_func = left_trans_funcs[i]
+            right_trans_func = right_trans_funcs[i]
+            left_file_name = left_file_names[i]
+            right_file_name = right_file_names[i]
+            data_save_file_extension = data_save_file_extensions[i]
+
+            left_df_trans = left_trans_func(left_df)
+            right_df_trans = right_trans_func(right_df)
+
+            left_data_save_file_name = (
+                f"{i}_intersecting_" 
+                + self._get_file_name_no_extension(left_file_name)
+                + f".{data_save_file_extension}"
+            )
+            right_data_save_file_name = (
+                f"{i}_intersecting_" 
+                + self._get_file_name_no_extension(right_file_name)
+                + f".{data_save_file_extension}"
+            )
+
+            LOGGER.info(f"For index {i}\n")
+
+            if options.match_rows:
+                left_value_counts = left_df_trans.value_counts(sort=False)
+                right_value_counts = right_df_trans.value_counts(sort=False)
+
+                shared = left_value_counts.index.intersection(right_value_counts.index)
+
+                min_of_shared = np.minimum(left_value_counts[shared], right_value_counts[shared])
+            
+                left_final_ind = pd.Index([], dtype=int)
+                for ind, count in list(pd.DataFrame(min_of_shared).itertuples(index=True)):
+                    ind = left_df_trans[left_df_trans.isin(ind)].dropna().head(count).index
+                    left_final_ind = left_final_ind.append(ind)
+
+                right_final_ind = pd.Index([], dtype=int)
+                for ind, count in list(pd.DataFrame(min_of_shared).itertuples(index=True)):
+                    ind = right_df_trans[right_df_trans.isin(ind)].dropna().head(count).index
+                    right_final_ind = right_final_ind.append(ind)
+            else:
+                left_df_trans_ind = left_df_trans.reset_index(names="_left_index")
+                right_df_trans_ind = right_df_trans.reset_index(names="_right_index")
+
+                merged_df = pd.merge(
+                    left_df_trans_ind, 
+                    right_df_trans_ind, 
+                    how="inner", 
+                    on=list(left_df_trans.columns),
+                )
+
+                left_final_ind = pd.Index(merged_df["_left_index"].drop_duplicates())
+                right_final_ind = pd.Index(merged_df["_right_index"].drop_duplicates())
+                
+            if output_transformed_rows:
+                left_final = left_df.iloc[left_final_ind].sort_index()
+                right_final = right_df.iloc[right_final_ind].sort_index()
+            else:
+                left_final = left_df_trans.iloc[left_final_ind].sort_index()
+                right_final = right_df_trans.iloc[right_final_ind].sort_index()
+
+            def _intersection_format(
+                name: str, 
+                df: pd.DataFrame,
+            ) -> str:
+                return f"Intersecting rows from {name} {df.shape}:\n{df.head(50)}\n"
+            
+            if options.drop_duplicates:
+                left_final = left_final.drop_duplicates(keep="first")
+                right_final = right_final.drop_duplicates(keep="first")
+
+            LOGGER.info(_intersection_format(left_file_name, left_final))
+            LOGGER.info(_intersection_format(right_file_name, right_final))
+            LOGGER.info(f"")
+
+            if self.output_dir is not None:
+                self._output_to_file(
+                    output_dir_path=data_save_dir_path,
+                    file_name=left_data_save_file_name,
+                    df=left_final, 
+                    logger=LOGGER,
+                )
+                self._output_to_file(
+                    output_dir_path=data_save_dir_path,
+                    file_name=right_data_save_file_name,
+                    df=right_final, 
+                    logger=LOGGER,
+                )
+
+            left_results.append(left_final)
+            right_results.append(right_final)
+        return left_results, right_results
+
     def _setup(
         self,
         options: CommandOptions,
@@ -438,19 +604,34 @@ class CsvCmp:
             all_locals: dict,
         ) -> str:
         all_locals.pop("self")
+        all_locals.pop("LOGGER")
         for key, val in all_locals.items():
             all_locals[key] = str(val)
         return f"{func_name}()\n{json.dumps(all_locals, indent=4)}\n"
 
 
 if __name__ == "__main__":
-    obj = CsvCmp("./src/tests/test-data/testset-1/")
-    obj.only_in(
+    # obj = CsvCmp("./src/tests/test-data/testset-1/")
+    # obj.only_in(
+    #     left_input=["test1.csv"],
+    #     right_input=["test2.csv"],
+    #     options=CommandOptions(
+    #         match_rows=False, 
+    #         enable_printing=False, 
+    #         add_save_timestamp=True,
+    #     ),
+    # )
+
+    obj = CsvCmp("./src/tests/test-data/intersection/testset-1/", None)
+    obj.intersection(
         left_input=["test1.csv"],
         right_input=["test2.csv"],
         options=CommandOptions(
             match_rows=False, 
-            enable_printing=False, 
+            enable_printing=True, 
             add_save_timestamp=True,
+            drop_duplicates=True,
         ),
     )
+
+    
