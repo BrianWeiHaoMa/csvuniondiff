@@ -8,6 +8,36 @@ import pandas as pd
 import numpy as np
 
 
+def change_inputs_to_dfs(
+        first_input: list[str | pd.DataFrame], 
+        drop_null: bool = False,
+        fill_null: str | None = "NULL",
+        input_dir: str | None = None,
+        **kwargs,
+    ) -> tuple[list[pd.DataFrame], ...]:
+    all_inputs = [first_input] + [input_ for input_ in kwargs.values()]
+
+    for input_ in all_inputs:
+        for i, val in enumerate(input_):
+            if type(val) == str:
+                if input_dir:
+                    val = os.path.join(input_dir, val)
+
+                if val.endswith(".csv"):
+                    input_[i] = pd.read_csv(val)    
+                elif val.endswith(".xlsx"):
+                    input_[i] = pd.read_excel(val)
+                else:
+                    raise ValueError(f"File type not supported: {val}")
+                
+                if drop_null:
+                    input_[i] = input_[i].dropna()
+                if fill_null is not None:
+                    input_[i] = input_[i].fillna(fill_null)
+                
+    return tuple(all_inputs)
+
+
 class CommandOptions:
     def __init__(
             self,
@@ -43,149 +73,94 @@ class ParallelInput:
             left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
             right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
             data_save_file_extensions: list[str] | None = None,
-            use_input_dir_path: bool = True,
         ):
         if type(left_input) != list:
             left_input = [left_input]
             right_input = [right_input]
-
-        if data_save_file_extensions is None:
-            data_save_file_extensions = ["csv"] * len(left_input)
-
-        if left_trans_funcs is None:
-            left_trans_funcs = [lambda x: x] * len(left_input)
-        
-        if right_trans_funcs is None:
-            right_trans_funcs = [lambda x: x] * len(right_input)
-
-        self.check_data(
-            left_input=left_input,
-            right_input=right_input,
-            left_trans_funcs=left_trans_funcs,
-            right_trans_funcs=right_trans_funcs,
-            data_save_file_extensions=data_save_file_extensions,
-        )
-
-        self.left_input = left_input
-        self.right_input = right_input
-        self.input_dir = input_dir
-        self.options = options
-        self.left_trans_funcs = left_trans_funcs
-        self.right_trans_funcs = right_trans_funcs
-        self.data_save_file_extensions = data_save_file_extensions
-        self.use_input_dir_path = use_input_dir_path
-
-    def check_data(
-            self,
-            left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-            right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-            left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            data_save_file_extensions: list[str] | None = None,
-        ) -> None:
         if len(left_input) != len(right_input):
             raise ValueError(f"The number of elements in left_input and right_input should be the same ({len(left_input)} != {len(right_input)})")
 
+        if data_save_file_extensions is None:
+            data_save_file_extensions = ["csv"] * len(left_input)
         if len(data_save_file_extensions) != len(left_input):
             raise ValueError(f"The number of elements in data_save_file_extensions should be the same as the number of elements in left_input ({len(data_save_file_extensions)} != {len(left_input)})")
-        
+
+        if left_trans_funcs is None:
+            left_trans_funcs = [lambda x: x] * len(left_input)
         if len(left_trans_funcs) != len(left_input):
             raise ValueError(f"The number of elements in left_trans_funcs should be the same as the number of elements in left_input ({len(left_trans_funcs)} != {len(left_input)})")
         
+        if right_trans_funcs is None:
+            right_trans_funcs = [lambda x: x] * len(right_input)
         if len(right_trans_funcs) != len(right_input):
             raise ValueError(f"The number of elements in right_trans_funcs should be the same as the number of elements in right_input ({len(right_trans_funcs)} != {len(right_input)})")
         
+        self.length = len(left_input)
+        self.index = 0
+        
+        self.left_names = self.get_names(left_input)
+        self.right_names = self.get_names(right_input)
+
+        self.left_dfs, self.right_dfs = change_inputs_to_dfs(
+            first_input=left_input, 
+            right_input=right_input,
+            drop_null=options.drop_null,
+            fill_null=options.fill_null,
+            input_dir=input_dir,
+        )
+
+        self.left_dfs_trans = [left_trans_funcs[i](self.left_dfs[i]) for i in range(self.length)]
+        self.right_dfs_trans = [right_trans_funcs[i](self.right_dfs[i]) for i in range(self.length)]
+
+        self.data_save_file_extensions = data_save_file_extensions
+        
     def get_names(
             self,
-            left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-            right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-        ) -> tuple[list[str], list[str]]:
-        left_names = [
-            self._get_file_name(input_) 
+            inputs: list[str | pd.DataFrame] | str | pd.DataFrame,
+        ) -> list[str]:
+        names = [
+            self.get_file_name(input_) 
             if type(input_) == str 
-            else f"df_{i}_{input_.shape}" for i, input_ in enumerate(left_input)
+            else f"df_{i}_{input_.shape}" for i, input_ in enumerate(inputs)
         ]
-        right_names = [
-            self._get_file_name(input_) 
-            if type(input_) == str 
-            else f"df_{i}_{input_.shape}" for i, input_ in enumerate(right_input)
-        ]
-        return left_names, right_names
-    
-    def change_inputs_to_dfs(
-            self, 
-            first_input: list[str | pd.DataFrame], 
-            use_input_dir_path: bool,
-            drop_null: bool,
-            fill_null: bool,
-            input_dir_path_override: str = None,
-            **kwargs,
-        ) -> tuple[list[pd.DataFrame], ...]:
-        all_inputs = [first_input] + [input_ for input_ in kwargs.values()]
+        return names
 
-        for input_ in all_inputs:
-            for i, val in enumerate(input_):
-                if type(val) == str:
-                    if use_input_dir_path:
-                        if input_dir_path_override is None:
-                            input_dir_path = self.input_dir
-                        else:
-                            input_dir_path = input_dir_path_override
-                        val = os.path.join(input_dir_path, val)
-
-                    if val.endswith(".csv"):
-                        input_[i] = pd.read_csv(val)    
-                    elif val.endswith(".xlsx"):
-                        input_[i] = pd.read_excel(val)
-                    else:
-                        raise ValueError(f"File type not supported: {val}")
-                    
-                    if drop_null:
-                        input_[i] = input_[i].dropna()
-                    if fill_null:
-                        input_[i] = input_[i].fillna("NULL")
-                    
-        return tuple(all_inputs)
-
-    def parse_input(
-            self
-        ) -> tuple[
-            list[pd.DataFrame], list[pd.DataFrame], 
-            list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]], 
-            list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]], 
-            list[str], 
-            list[str], 
-            list[str]
-        ]:        
-        left_names, right_names = self.get_names(
-            self.left_input, 
-            self.right_input,
-        )
-
-        left_dfs, right_dfs = self.change_inputs_to_dfs(
-            self.left_input, 
-            right_input=self.right_input,
-            use_input_dir_path=self.use_input_dir_path,
-            drop_null=self.options.drop_null,
-            fill_null=self.options.fill_null,
-        )
-        
-        return (
-            left_dfs, 
-            right_dfs, 
-            self.left_trans_funcs,
-            self.right_trans_funcs,
-            left_names, 
-            right_names, 
-            self.data_save_file_extensions,
-        )
-
-    def _get_file_name(
+    def get_file_name(
             self, 
             file_path: str,
         ) -> str:
         file_name = os.path.basename(file_path)
         return file_name
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.index >= self.length:
+            raise StopIteration
+        
+        left_df = self.left_dfs[self.index]
+        right_df = self.right_dfs[self.index]
+        left_df_trans = self.left_dfs_trans[self.index]
+        right_df_trans = self.right_dfs_trans[self.index]
+        left_name = self.left_names[self.index]
+        right_name = self.right_names[self.index]
+        data_save_file_extension = self.data_save_file_extensions[self.index]
+
+        old_index = self.index
+        self.index += 1
+            
+        return (
+            old_index,
+            left_df,
+            right_df,
+            left_df_trans,
+            right_df_trans,
+            left_name,
+            right_name,
+            data_save_file_extension,
+        )
+
 
 
 class CsvCmp:
@@ -205,41 +180,13 @@ class CsvCmp:
             left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
             right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
             data_save_file_extensions: list[str] | None = None,
-            use_input_dir_path: bool = True,
             output_transformed_rows: bool = False,
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
             options=options,
             command=self.only_in,
+            local_vars=locals(),
         )
-
-        LOGGER.info(
-            self._get_function_info_string(
-                self.only_in.__name__, 
-                locals(),
-            )
-        )
-
-        parallel_input_parser = ParallelInput(
-            left_input=left_input,
-            right_input=right_input,
-            input_dir=self.input_dir,
-            options=options,
-            left_trans_funcs=left_trans_funcs,
-            right_trans_funcs=right_trans_funcs,
-            data_save_file_extensions=data_save_file_extensions,
-            use_input_dir_path=use_input_dir_path,
-        )
-
-        (
-            left_dfs, 
-            right_dfs, 
-            left_trans_funcs,
-            right_trans_funcs,
-            left_file_names, 
-            right_file_names, 
-            data_save_file_extensions,
-        ) = parallel_input_parser.parse_input()
 
         def _get_left_and_right_only_ind(
                 left_df: pd.DataFrame, 
@@ -258,38 +205,42 @@ class CsvCmp:
                 indicator=True,
             )
 
-            left_index_series = outer_df[
-                outer_df["_merge"] == "left_only"
-            ]["_left_index"]
-            right_index_series = outer_df[
-                outer_df["_merge"] == "right_only"
-            ]["_right_index"]
+            left_index_series = outer_df[outer_df["_merge"] == "left_only"]["_left_index"]
+            right_index_series = outer_df[outer_df["_merge"] == "right_only"]["_right_index"]
             
             return pd.Index(left_index_series), pd.Index(right_index_series)
+        
+        parallel_input = ParallelInput(
+            left_input=left_input,
+            right_input=right_input,
+            input_dir=self.input_dir,
+            options=options,
+            left_trans_funcs=left_trans_funcs,
+            right_trans_funcs=right_trans_funcs,
+            data_save_file_extensions=data_save_file_extensions,
+        )
 
         left_only_results = []
         right_only_results = []
 
-        for i in range(len(left_dfs)):
-            left_df = left_dfs[i] 
-            right_df = right_dfs[i] 
-            left_trans_func = left_trans_funcs[i]
-            right_trans_func = right_trans_funcs[i]
-            left_file_name = left_file_names[i]
-            right_file_name = right_file_names[i]
-            data_save_file_extension = data_save_file_extensions[i]
-
-            left_df_trans = left_trans_func(left_df)
-            right_df_trans = right_trans_func(right_df)
-
+        for (
+            i,
+            left_df,
+            right_df,
+            left_df_trans,
+            right_df_trans,
+            left_name,
+            right_name,
+            data_save_file_extension,
+        ) in parallel_input:
             left_data_save_file_name = (
                 f"{i}_only_in_" 
-                + self._get_file_name_no_extension(left_file_name)
+                + self._get_file_name_no_extension(left_name)
                 + f".{data_save_file_extension}"
             )
             right_data_save_file_name = (
                 f"{i}_only_in_" 
-                + self._get_file_name_no_extension(right_file_name)
+                + self._get_file_name_no_extension(right_name)
                 + f".{data_save_file_extension}"
             )
 
@@ -341,8 +292,8 @@ class CsvCmp:
                 left_only_final = left_only_final.drop_duplicates(keep="first")
                 right_only_final = right_only_final.drop_duplicates(keep="first")
 
-            LOGGER.info(_only_in_format(left_file_name, left_only_final))
-            LOGGER.info(_only_in_format(right_file_name, right_only_final))
+            LOGGER.info(_only_in_format(left_name, left_only_final))
+            LOGGER.info(_only_in_format(right_name, right_only_final))
             LOGGER.info("")
 
             if self.output_dir is not None:
@@ -371,22 +322,15 @@ class CsvCmp:
             left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
             right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
             data_save_file_extensions: list[str] | None = None,
-            use_input_dir_path: bool = True,
             output_transformed_rows: bool = False,
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
             options=options,
             command=self.intersection,
+            local_vars=locals(),
         )
 
-        LOGGER.info(
-            self._get_function_info_string(
-                self.intersection.__name__, 
-                locals(),
-            )
-        )
-
-        parallel_input_parser = ParallelInput(
+        parallel_input = ParallelInput(
             left_input=left_input,
             right_input=right_input,
             input_dir=self.input_dir,
@@ -394,42 +338,29 @@ class CsvCmp:
             left_trans_funcs=left_trans_funcs,
             right_trans_funcs=right_trans_funcs,
             data_save_file_extensions=data_save_file_extensions,
-            use_input_dir_path=use_input_dir_path,
         )
-
-        (
-            left_dfs, 
-            right_dfs, 
-            left_trans_funcs,
-            right_trans_funcs,
-            left_file_names, 
-            right_file_names, 
-            data_save_file_extensions,
-        ) = parallel_input_parser.parse_input()
 
         left_results = []
         right_results = []
 
-        for i in range(len(left_dfs)):
-            left_df = left_dfs[i] 
-            right_df = right_dfs[i] 
-            left_trans_func = left_trans_funcs[i]
-            right_trans_func = right_trans_funcs[i]
-            left_file_name = left_file_names[i]
-            right_file_name = right_file_names[i]
-            data_save_file_extension = data_save_file_extensions[i]
-
-            left_df_trans = left_trans_func(left_df)
-            right_df_trans = right_trans_func(right_df)
-
+        for (
+            i,
+            left_df,
+            right_df,
+            left_df_trans,
+            right_df_trans,
+            left_name,
+            right_name,
+            data_save_file_extension,
+        ) in parallel_input:
             left_data_save_file_name = (
                 f"{i}_intersecting_" 
-                + self._get_file_name_no_extension(left_file_name)
+                + self._get_file_name_no_extension(left_name)
                 + f".{data_save_file_extension}"
             )
             right_data_save_file_name = (
                 f"{i}_intersecting_" 
-                + self._get_file_name_no_extension(right_file_name)
+                + self._get_file_name_no_extension(right_name)
                 + f".{data_save_file_extension}"
             )
 
@@ -483,8 +414,8 @@ class CsvCmp:
                 left_final = left_final.drop_duplicates(keep="first")
                 right_final = right_final.drop_duplicates(keep="first")
 
-            LOGGER.info(_intersection_format(left_file_name, left_final))
-            LOGGER.info(_intersection_format(right_file_name, right_final))
+            LOGGER.info(_intersection_format(left_name, left_final))
+            LOGGER.info(_intersection_format(right_name, right_final))
             LOGGER.info(f"")
 
             if self.output_dir is not None:
@@ -509,6 +440,7 @@ class CsvCmp:
         self,
         options: CommandOptions,
         command: Callable,
+        local_vars: dict,
     ) -> tuple[logging.Logger, str | None]:
         if self.output_dir is not None:
             data_save_dir_path = self._make_output_dir(
@@ -524,6 +456,14 @@ class CsvCmp:
             output_file_name=f"{command.__name__}.log",
             logger_name=command.__name__,
         )
+
+        LOGGER.info(
+            self._get_function_info_string(
+                command.__name__, 
+                local_vars,
+            )
+        )
+
         return LOGGER, data_save_dir_path
     
     def _get_logger(
@@ -604,34 +544,33 @@ class CsvCmp:
             all_locals: dict,
         ) -> str:
         all_locals.pop("self")
-        all_locals.pop("LOGGER")
         for key, val in all_locals.items():
             all_locals[key] = str(val)
         return f"{func_name}()\n{json.dumps(all_locals, indent=4)}\n"
 
 
 if __name__ == "__main__":
-    # obj = CsvCmp("./src/tests/test-data/testset-1/")
-    # obj.only_in(
-    #     left_input=["test1.csv"],
-    #     right_input=["test2.csv"],
-    #     options=CommandOptions(
-    #         match_rows=False, 
-    #         enable_printing=False, 
-    #         add_save_timestamp=True,
-    #     ),
-    # )
-
-    obj = CsvCmp("./src/tests/test-data/intersection/testset-1/", None)
-    obj.intersection(
+    obj = CsvCmp("./src/tests/test-data/only-in/testset-1/")
+    obj.only_in(
         left_input=["test1.csv"],
         right_input=["test2.csv"],
         options=CommandOptions(
             match_rows=False, 
-            enable_printing=True, 
+            enable_printing=False, 
             add_save_timestamp=True,
-            drop_duplicates=True,
         ),
     )
+
+    # obj = CsvCmp("./src/tests/test-data/intersection/testset-1/")
+    # obj.intersection(
+    #     left_input=["test1.csv"],
+    #     right_input=["test2.csv"],
+    #     options=CommandOptions(
+    #         match_rows=False, 
+    #         enable_printing=True, 
+    #         add_save_timestamp=True,
+    #         drop_duplicates=True,
+    #     ),
+    # )
 
     
