@@ -2,7 +2,11 @@ from unittest import TestCase
 
 import pandas as pd
 
-from src.csvcmp import CsvCmp, CommandOptions
+from src.csvcmp import (
+    CsvCmp, 
+    CommandOptions,
+    ParallelInput,
+)
 
 
 class OnlyInTest(TestCase):
@@ -67,8 +71,8 @@ class OnlyInTest(TestCase):
             'Age': [33]
         }, index=[7])
         
-        self.assertEqual(left_df.equals(expected_left_df), True)
-        self.assertEqual(right_df.equals(expected_right_df), True)
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
 
     def _test_match_rows_true_helper(
             self, 
@@ -98,8 +102,8 @@ class OnlyInTest(TestCase):
             'Email': ['johndoe@example.com', 'janesmith@example.com', 'johnsmith@example.com', 'michaeljohnson@example.com', 'emilydavis@example.com']
         }, index=[1, 3, 6, 7, 8])
 
-        self.assertEqual(left_df.equals(expected_left_df), True)
-        self.assertEqual(right_df.equals(expected_right_df), True)
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
 
     def _test_match_rows_false_helper(self, input_dir: str, left_xlsx: str, right_xlsx: str):
         obj = CsvCmp(input_dir, None)
@@ -124,8 +128,8 @@ class OnlyInTest(TestCase):
             'Email': ['johnsmith@example.com', 'michaeljohnson@example.com', 'emilydavis@example.com']
         }, index=[6, 7, 8])
 
-        self.assertEqual(left_df.equals(expected_left_df), True)
-        self.assertEqual(right_df.equals(expected_right_df), True)
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
 
 
 class IntersectionTest(TestCase):
@@ -154,8 +158,8 @@ class IntersectionTest(TestCase):
             'City': ['New York', 'Chicago', 'San Francisco', 'Boston', 'Seattle', 'Seattle', 'Houston', 'Miami', 'Dallas', 'Denver', 'Phoenix', 'Austin', 'Portland', 'San Diego', 'Nashville', 'Philadelphia', 'Orlando', 'Washington D.C.']
         }, index=[0, 1, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 
-        self.assertEqual(left_df.equals(expected_left_df), True)
-        self.assertEqual(right_df.equals(expected_right_df), True)
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
 
     def test_match_rows_false(self):
         obj = CsvCmp(f"{self.test_set_folder}testset-1", None)
@@ -180,5 +184,78 @@ class IntersectionTest(TestCase):
             'City': ['New York', 'Chicago', 'San Francisco', 'Boston', 'Seattle', 'Seattle', 'Houston', 'Miami', 'Dallas', 'Denver', 'Phoenix', 'Austin', 'Portland', 'San Diego', 'Nashville', 'Philadelphia', 'Orlando', 'Washington D.C.']
         }, index=[0, 1, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 
-        self.assertEqual(left_df.equals(expected_left_df), True)
-        self.assertEqual(right_df.equals(expected_right_df), True)
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
+
+
+class ParallelInputTest(TestCase):
+    test_set_folder = f"./src/tests/test-data/random/"
+
+    def test_columns_to_use(self):
+        obj = ParallelInput(
+            left_input=["test1.csv"], 
+            right_input=["test1.csv"], 
+            input_dir=f"{self.test_set_folder}",
+            options=CommandOptions(columns_to_use=["column3", "column4"]),
+        )
+
+        for (
+            i,
+            left_df,
+            right_df,
+            left_df_trans,
+            right_df_trans,
+            columns_to_use,
+            left_name,
+            right_name,
+            data_save_file_extension,
+        ) in obj:
+            self.assertTrue(columns_to_use.equals(pd.Index(["column3", "column4"])))
+
+    def test_columns_to_ignore(self):
+        obj = ParallelInput(
+            left_input=["test1.csv"], 
+            right_input=["test1.csv"], 
+            input_dir=f"{self.test_set_folder}",
+            options=CommandOptions(columns_to_ignore=["column3", "column4"]),
+        )    
+
+        for (
+            i,
+            left_df,
+            right_df,
+            left_df_trans,
+            right_df_trans,
+            columns_to_use,
+            left_name,
+            right_name,
+            data_save_file_extension,
+        ) in obj:
+            self.assertTrue(columns_to_use.equals(pd.Index(["column1", "column2", "column5"])))
+
+    def test_columns_to_use_and_ignore(self):
+         with self.assertRaises(ValueError):
+             obj = CommandOptions(columns_to_use=["column3", "column4"], columns_to_ignore=["column3"])
+
+    def test_align_columns(self):
+        obj = ParallelInput(
+            left_input=["test2.csv"], 
+            right_input=["test3.csv"], 
+            input_dir=f"{self.test_set_folder}",
+            options=CommandOptions(align_columns=True),
+        )
+
+        for (
+            i,
+            left_df,
+            right_df,
+            left_df_trans,
+            right_df_trans,
+            columns_to_use,
+            left_name,
+            right_name,
+            data_save_file_extension,
+        ) in obj:
+            self.assertTrue(columns_to_use.equals(pd.Index(["column1", "column2", "column3", "column4"])))
+            self.assertTrue(left_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4", "column5", "column6", "column7"])))
+            self.assertTrue(right_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4"])))

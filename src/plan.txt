@@ -11,5 +11,6 @@ global options:
     --input-dir (use this dir as the base for the path to the files)
     --output-dir (use this dir as the base for the outputs of the script)
 
-    --use-index (accounts for row position for comparison as well)
+    possible but not sure if worth it:
+        --use-index (accounts for row position for comparison as well)
     

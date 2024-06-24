@@ -27,6 +27,12 @@ def change_inputs_to_dfs(
                     input_[i] = pd.read_csv(val)    
                 elif val.endswith(".xlsx"):
                     input_[i] = pd.read_excel(val)
+                elif val.endswith(".json"):
+                    input_[i] = pd.read_json(val)
+                elif val.endswith(".xml"):
+                    input_[i] = pd.read_xml(val)
+                elif val.endswith(".html"):
+                    input_[i] = pd.read_html(val)[0]
                 else:
                     raise ValueError(f"File type not supported: {val}")
                 
@@ -43,6 +49,7 @@ class CommandOptions:
             self,
             align_columns: bool | None = None,
             columns_to_use: list[str] | None = None,
+            columns_to_ignore: list[str] | None = None,
             fill_null: bool | None = None,
             drop_null: bool | None = None,
             match_rows: bool | None = None,
@@ -52,12 +59,16 @@ class CommandOptions:
         ):
         self.align_columns = align_columns
         self.columns_to_use = columns_to_use
+        self.columns_to_ignore = columns_to_ignore
         self.fill_null = fill_null
         self.drop_null = drop_null
         self.match_rows = match_rows
         self.enable_printing = enable_printing
         self.add_save_timestamp = add_save_timestamp
         self.drop_duplicates = drop_duplicates
+
+        if columns_to_ignore is not None and columns_to_use is not None:
+            raise ValueError("Cannot have both columns_to_use and columns_to_ignore set")
 
     def __str__(self) -> str:
         return str(self.__dict__)
@@ -97,6 +108,8 @@ class ParallelInput:
         
         self.length = len(left_input)
         self.index = 0
+
+        self.options = options
         
         self.left_names = self.get_names(left_input)
         self.right_names = self.get_names(right_input)
@@ -132,35 +145,66 @@ class ParallelInput:
         file_name = os.path.basename(file_path)
         return file_name
     
+    def align_columns(
+            self,
+            left_df: pd.DataFrame,
+            right_df: pd.DataFrame,
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        common_columns = left_df.columns.intersection(right_df.columns, sort=True)
+        left_only_columns = left_df.columns.difference(common_columns)
+        right_only_columns = right_df.columns.difference(common_columns)
+        left_df = left_df[common_columns.append(left_only_columns)]
+        right_df = right_df[common_columns.append(right_only_columns)]
+        # left_df = left_df.reindex(columns=common_columns.append(left_only_columns))
+        # right_df = right_df.reindex(columns=common_columns.append(right_only_columns))
+        return left_df, right_df
+    
     def __iter__(self):
         return self
     
     def __next__(self):
-        if self.index >= self.length:
-            raise StopIteration
-        
-        left_df = self.left_dfs[self.index]
-        right_df = self.right_dfs[self.index]
-        left_df_trans = self.left_dfs_trans[self.index]
-        right_df_trans = self.right_dfs_trans[self.index]
-        left_name = self.left_names[self.index]
-        right_name = self.right_names[self.index]
-        data_save_file_extension = self.data_save_file_extensions[self.index]
+        if self.index < self.length:
+            left_df = self.left_dfs[self.index]
+            right_df = self.right_dfs[self.index]
+            left_df_trans = self.left_dfs_trans[self.index]
+            right_df_trans = self.right_dfs_trans[self.index]
+            left_name = self.left_names[self.index]
+            right_name = self.right_names[self.index]
+            data_save_file_extension = self.data_save_file_extensions[self.index]
 
-        old_index = self.index
-        self.index += 1
+            if self.options.columns_to_use is not None:
+                columns_to_use = pd.Index(self.options.columns_to_use)
+            elif self.options.columns_to_ignore is not None:
+                columns_to_ignore = pd.Index(self.options.columns_to_ignore)
+                
+                left_columns_to_use = left_df_trans.columns.difference(columns_to_ignore)
+                right_columns_to_use = right_df_trans.columns.difference(columns_to_ignore)
+                if left_columns_to_use.difference(right_columns_to_use).size > 0:
+                    raise ValueError(f"Final left and right dfs do not both have the given columns")
+                
+                columns_to_use = left_columns_to_use
+            else:
+                columns_to_use = left_df_trans.columns.intersection(right_df_trans.columns)
             
-        return (
-            old_index,
-            left_df,
-            right_df,
-            left_df_trans,
-            right_df_trans,
-            left_name,
-            right_name,
-            data_save_file_extension,
-        )
+            if self.options.align_columns:
+                left_df, right_df = self.align_columns(left_df, right_df)
+                left_df_trans, right_df_trans = self.align_columns(left_df_trans, right_df_trans)
 
+            old_index = self.index
+            self.index += 1
+                
+            return (
+                old_index,
+                left_df,
+                right_df,
+                left_df_trans,
+                right_df_trans,
+                columns_to_use,
+                left_name,
+                right_name,
+                data_save_file_extension,
+            )
+        raise StopIteration        
 
 
 class CsvCmp:
@@ -191,9 +235,8 @@ class CsvCmp:
         def _get_left_and_right_only_ind(
                 left_df: pd.DataFrame, 
                 right_df: pd.DataFrame,
+                columns_to_use: pd.Index,
             ) -> tuple[pd.Index, pd.Index]:
-            columns = list(left_df.columns)
-
             left_df_ind = left_df.reset_index(names="_left_index")
             right_df_ind = right_df.reset_index(names="_right_index")
 
@@ -201,24 +244,14 @@ class CsvCmp:
                 left_df_ind, 
                 right_df_ind, 
                 how="outer", 
-                on=columns, 
+                on=columns_to_use.tolist(), 
                 indicator=True,
             )
 
-            left_index_series = outer_df[outer_df["_merge"] == "left_only"]["_left_index"]
-            right_index_series = outer_df[outer_df["_merge"] == "right_only"]["_right_index"]
+            left_index_series = outer_df[outer_df["_merge"] == "left_only"]["_left_index"].astype(int)
+            right_index_series = outer_df[outer_df["_merge"] == "right_only"]["_right_index"].astype(int)
             
             return pd.Index(left_index_series), pd.Index(right_index_series)
-        
-        parallel_input = ParallelInput(
-            left_input=left_input,
-            right_input=right_input,
-            input_dir=self.input_dir,
-            options=options,
-            left_trans_funcs=left_trans_funcs,
-            right_trans_funcs=right_trans_funcs,
-            data_save_file_extensions=data_save_file_extensions,
-        )
 
         left_only_results = []
         right_only_results = []
@@ -229,10 +262,19 @@ class CsvCmp:
             right_df,
             left_df_trans,
             right_df_trans,
+            columns_to_use,
             left_name,
             right_name,
             data_save_file_extension,
-        ) in parallel_input:
+        ) in ParallelInput(
+            left_input=left_input,
+            right_input=right_input,
+            input_dir=self.input_dir,
+            options=options,
+            left_trans_funcs=left_trans_funcs,
+            right_trans_funcs=right_trans_funcs,
+            data_save_file_extensions=data_save_file_extensions,
+        ):
             left_data_save_file_name = (
                 f"{i}_only_in_" 
                 + self._get_file_name_no_extension(left_name)
@@ -247,8 +289,8 @@ class CsvCmp:
             LOGGER.info(f"For index {i}\n")
 
             if options.match_rows:
-                left_value_counts = left_df_trans.value_counts()
-                right_value_counts = right_df_trans.value_counts()
+                left_value_counts = left_df_trans.value_counts(subset=columns_to_use.to_list())
+                right_value_counts = right_df_trans.value_counts(subset=columns_to_use.to_list())
 
                 shared = left_value_counts.index.intersection(right_value_counts.index)
 
@@ -268,12 +310,12 @@ class CsvCmp:
                     ind = right_df_trans[right_df_trans.isin(ind)].dropna().tail(count).index
                     right_to_add_indices = right_to_add_indices.append(ind)
 
-                left_only_ind, right_only_ind = _get_left_and_right_only_ind(left_df_trans, right_df_trans)
+                left_only_ind, right_only_ind = _get_left_and_right_only_ind(left_df_trans, right_df_trans, columns_to_use)
 
                 left_only_final_ind = left_only_ind.append(left_to_add_indices)
                 right_only_final_ind = right_only_ind.append(right_to_add_indices)
             else:
-                left_only_final_ind, right_only_final_ind = _get_left_and_right_only_ind(left_df_trans, right_df_trans)
+                left_only_final_ind, right_only_final_ind = _get_left_and_right_only_ind(left_df_trans, right_df_trans, columns_to_use)
 
             if output_transformed_rows:
                 left_only_final = left_df.iloc[left_only_final_ind].sort_index()
@@ -330,16 +372,6 @@ class CsvCmp:
             local_vars=locals(),
         )
 
-        parallel_input = ParallelInput(
-            left_input=left_input,
-            right_input=right_input,
-            input_dir=self.input_dir,
-            options=options,
-            left_trans_funcs=left_trans_funcs,
-            right_trans_funcs=right_trans_funcs,
-            data_save_file_extensions=data_save_file_extensions,
-        )
-
         left_results = []
         right_results = []
 
@@ -349,10 +381,19 @@ class CsvCmp:
             right_df,
             left_df_trans,
             right_df_trans,
+            columns_to_use,
             left_name,
             right_name,
             data_save_file_extension,
-        ) in parallel_input:
+        ) in ParallelInput(
+            left_input=left_input,
+            right_input=right_input,
+            input_dir=self.input_dir,
+            options=options,
+            left_trans_funcs=left_trans_funcs,
+            right_trans_funcs=right_trans_funcs,
+            data_save_file_extensions=data_save_file_extensions,
+        ):
             left_data_save_file_name = (
                 f"{i}_intersecting_" 
                 + self._get_file_name_no_extension(left_name)
@@ -367,8 +408,8 @@ class CsvCmp:
             LOGGER.info(f"For index {i}\n")
 
             if options.match_rows:
-                left_value_counts = left_df_trans.value_counts(sort=False)
-                right_value_counts = right_df_trans.value_counts(sort=False)
+                left_value_counts = left_df_trans.value_counts(sort=False, subset=columns_to_use.to_list())
+                right_value_counts = right_df_trans.value_counts(sort=False, subset=columns_to_use.to_list())
 
                 shared = left_value_counts.index.intersection(right_value_counts.index)
 
@@ -391,7 +432,7 @@ class CsvCmp:
                     left_df_trans_ind, 
                     right_df_trans_ind, 
                     how="inner", 
-                    on=list(left_df_trans.columns),
+                    on=columns_to_use.to_list(),
                 )
 
                 left_final_ind = pd.Index(merged_df["_left_index"].drop_duplicates())
@@ -535,6 +576,12 @@ class CsvCmp:
             df.to_csv(full_file_path, index=False)
         elif full_file_path.endswith(".xlsx"):
             df.to_excel(full_file_path, index=False)
+        elif full_file_path.endswith(".json"):
+            df.to_json(full_file_path, orient="records", indent=4, index=False)
+        elif full_file_path.endswith(".xml"):
+            df.to_xml(full_file_path, index=False)
+        elif full_file_path.endswith(".html"):
+            df.to_html(full_file_path, index=False)
         else:
             raise ValueError(f"File type not supported: {full_file_path}")
 
@@ -550,16 +597,16 @@ class CsvCmp:
 
 
 if __name__ == "__main__":
-    obj = CsvCmp("./src/tests/test-data/only-in/testset-1/")
-    obj.only_in(
-        left_input=["test1.csv"],
-        right_input=["test2.csv"],
-        options=CommandOptions(
-            match_rows=False, 
-            enable_printing=False, 
-            add_save_timestamp=True,
-        ),
-    )
+    # obj = CsvCmp("./src/tests/test-data/only-in/testset-1/")
+    # obj.only_in(
+    #     left_input=["test1.csv"],
+    #     right_input=["test2.csv"],
+    #     options=CommandOptions(
+    #         match_rows=False, 
+    #         enable_printing=False, 
+    #         add_save_timestamp=True,
+    #     ),
+    # )
 
     # obj = CsvCmp("./src/tests/test-data/intersection/testset-1/")
     # obj.intersection(
@@ -572,5 +619,15 @@ if __name__ == "__main__":
     #         drop_duplicates=True,
     #     ),
     # )
-
     
+    obj = CsvCmp("./src/tests/test-data/random/")
+    obj.only_in(
+        left_input=["test2.csv"],
+        right_input=["test3.csv"],
+        options=CommandOptions(
+            match_rows=True, 
+            enable_printing=True, 
+            add_save_timestamp=True,
+            align_columns=True,
+        ),
+    )
