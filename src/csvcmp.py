@@ -43,6 +43,18 @@ def change_inputs_to_dfs(
                 
     return tuple(all_inputs)
 
+def pretty_format_dict(
+        func: Callable[[object], dict],
+    ) -> str:
+    def wrapper(*args, **kwargs):
+        data = func(*args, **kwargs)
+        res = ""
+        for key, val in data.items():
+            if val is not None:
+                res += f"{key}: {val}\n"
+        return res
+    return wrapper
+
 
 class CommandOptions:
     def __init__(
@@ -70,21 +82,44 @@ class CommandOptions:
         if columns_to_ignore is not None and columns_to_use is not None:
             raise ValueError("Cannot have both columns_to_use and columns_to_ignore set")
 
-    def __str__(self) -> str:
-        return str(self.__dict__)
+    @pretty_format_dict
+    def __str__(self):
+        return self.__dict__
+
+
+class ParallelInputArgs:
+    def __init__(
+        self, 
+        left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+        right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+        left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
+        right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
+        data_save_file_extensions: list[str] | None = None,
+    ):
+        self.left_input = left_input
+        self.right_input = right_input
+        self.left_trans_funcs = left_trans_funcs
+        self.right_trans_funcs = right_trans_funcs
+        self.data_save_file_extensions = data_save_file_extensions
+
+    @pretty_format_dict
+    def __str__(self):
+        return self.__dict__
 
 
 class ParallelInput:
     def __init__(
             self, 
-            left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-            right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+            data: ParallelInputArgs,
             input_dir: str,
             options: CommandOptions = CommandOptions(),
-            left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            data_save_file_extensions: list[str] | None = None,
         ):
+        left_input = data.left_input
+        right_input = data.right_input
+        left_trans_funcs = data.left_trans_funcs
+        right_trans_funcs = data.right_trans_funcs
+        data_save_file_extensions = data.data_save_file_extensions
+
         if type(left_input) != list:
             left_input = [left_input]
             right_input = [right_input]
@@ -155,10 +190,11 @@ class ParallelInput:
         right_only_columns = right_df.columns.difference(common_columns)
         left_df = left_df[common_columns.append(left_only_columns)]
         right_df = right_df[common_columns.append(right_only_columns)]
-        # left_df = left_df.reindex(columns=common_columns.append(left_only_columns))
-        # right_df = right_df.reindex(columns=common_columns.append(right_only_columns))
         return left_df, right_df
     
+    def __len__(self):
+        return self.length
+
     def __iter__(self):
         return self
     
@@ -207,7 +243,7 @@ class ParallelInput:
         raise StopIteration        
 
 
-class CsvCmp:
+class CSVCmp:
     def __init__(
             self, 
             input_dir: str = "./",
@@ -218,12 +254,8 @@ class CsvCmp:
 
     def only_in(
             self, 
-            left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-            right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+            args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
-            left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            data_save_file_extensions: list[str] | None = None,
             output_transformed_rows: bool = False,
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
@@ -248,13 +280,25 @@ class CsvCmp:
                 indicator=True,
             )
 
-            left_index_series = outer_df[outer_df["_merge"] == "left_only"]["_left_index"].astype(int)
-            right_index_series = outer_df[outer_df["_merge"] == "right_only"]["_right_index"].astype(int)
+            left_index_series = outer_df[outer_df["_merge"] == "left_only"]["_left_index"]
+            right_index_series = outer_df[outer_df["_merge"] == "right_only"]["_right_index"]
             
             return pd.Index(left_index_series), pd.Index(right_index_series)
 
         left_only_results = []
         right_only_results = []
+
+        parallel_input = ParallelInput(
+            ParallelInputArgs(
+                left_input=args.left_input,
+                right_input=args.right_input,
+                left_trans_funcs=args.left_trans_funcs,
+                right_trans_funcs=args.right_trans_funcs,
+                data_save_file_extensions=args.data_save_file_extensions,
+            ),
+            input_dir=self.input_dir,
+            options=options,
+        )
 
         for (
             i,
@@ -266,15 +310,7 @@ class CsvCmp:
             left_name,
             right_name,
             data_save_file_extension,
-        ) in ParallelInput(
-            left_input=left_input,
-            right_input=right_input,
-            input_dir=self.input_dir,
-            options=options,
-            left_trans_funcs=left_trans_funcs,
-            right_trans_funcs=right_trans_funcs,
-            data_save_file_extensions=data_save_file_extensions,
-        ):
+        ) in parallel_input:
             left_data_save_file_name = (
                 f"{i}_only_in_" 
                 + self._get_file_name_no_extension(left_name)
@@ -286,7 +322,8 @@ class CsvCmp:
                 + f".{data_save_file_extension}"
             )
 
-            LOGGER.info(f"For index {i}\n")
+            if len(parallel_input) > 1:
+                LOGGER.info(f"For input pair {i}\n")
 
             if options.match_rows:
                 left_value_counts = left_df_trans.value_counts(subset=columns_to_use.to_list())
@@ -358,12 +395,8 @@ class CsvCmp:
     
     def intersection(
             self, 
-            left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-            right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+            args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
-            left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-            data_save_file_extensions: list[str] | None = None,
             output_transformed_rows: bool = False,
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
@@ -375,6 +408,18 @@ class CsvCmp:
         left_results = []
         right_results = []
 
+        parallel_input = ParallelInput(
+            ParallelInputArgs(
+                left_input=args.left_input,
+                right_input=args.right_input,
+                left_trans_funcs=args.left_trans_funcs,
+                right_trans_funcs=args.right_trans_funcs,
+                data_save_file_extensions=args.data_save_file_extensions,
+            ),
+            input_dir=self.input_dir,
+            options=options,
+        )
+
         for (
             i,
             left_df,
@@ -385,15 +430,7 @@ class CsvCmp:
             left_name,
             right_name,
             data_save_file_extension,
-        ) in ParallelInput(
-            left_input=left_input,
-            right_input=right_input,
-            input_dir=self.input_dir,
-            options=options,
-            left_trans_funcs=left_trans_funcs,
-            right_trans_funcs=right_trans_funcs,
-            data_save_file_extensions=data_save_file_extensions,
-        ):
+        ) in parallel_input:
             left_data_save_file_name = (
                 f"{i}_intersecting_" 
                 + self._get_file_name_no_extension(left_name)
@@ -405,7 +442,8 @@ class CsvCmp:
                 + f".{data_save_file_extension}"
             )
 
-            LOGGER.info(f"For index {i}\n")
+            if len(parallel_input) > 1:
+                LOGGER.info(f"For input pair {i}\n")
 
             if options.match_rows:
                 left_value_counts = left_df_trans.value_counts(sort=False, subset=columns_to_use.to_list())
@@ -591,27 +629,38 @@ class CsvCmp:
             all_locals: dict,
         ) -> str:
         all_locals.pop("self")
+        middle = ""
         for key, val in all_locals.items():
-            all_locals[key] = str(val)
-        return f"{func_name}()\n{json.dumps(all_locals, indent=4)}\n"
+            string = f"{key}\n{"-" * len(key)}\n{str(val)}\n"
+            middle += string
+        indent = 4
+        lines = middle.split("\n")
+        shifted_lines = [' ' * indent + line for line in lines]
+        middle = "\n".join(shifted_lines)
+        final_string = f"{func_name}(\n\n{middle}\n)\n"
+        return final_string
 
 
 if __name__ == "__main__":
-    # obj = CsvCmp("./src/tests/test-data/only-in/testset-1/")
-    # obj.only_in(
-    #     left_input=["test1.csv"],
-    #     right_input=["test2.csv"],
-    #     options=CommandOptions(
-    #         match_rows=False, 
-    #         enable_printing=False, 
-    #         add_save_timestamp=True,
-    #     ),
-    # )
+    obj = CSVCmp("./src/tests/test-data/only-in/testset-1/")
+    obj.only_in(
+        ParallelInputArgs(
+            left_input=["test1.csv"],
+            right_input=["test2.csv"],
+        ),
+        options=CommandOptions(
+            match_rows=False, 
+            enable_printing=True, 
+            add_save_timestamp=True,
+        ),
+    )
 
-    # obj = CsvCmp("./src/tests/test-data/intersection/testset-1/")
+    # obj = CSVCmp("./src/tests/test-data/intersection/testset-1/")
     # obj.intersection(
-    #     left_input=["test1.csv"],
-    #     right_input=["test2.csv"],
+    #     ParallelInputArgs(
+    #         left_input=["test1.csv"],
+    #         right_input=["test2.csv"],
+    #     ),
     #     options=CommandOptions(
     #         match_rows=False, 
     #         enable_printing=True, 
@@ -620,14 +669,16 @@ if __name__ == "__main__":
     #     ),
     # )
     
-    obj = CsvCmp("./src/tests/test-data/random/")
-    obj.only_in(
-        left_input=["test2.csv"],
-        right_input=["test3.csv"],
-        options=CommandOptions(
-            match_rows=True, 
-            enable_printing=True, 
-            add_save_timestamp=True,
-            align_columns=True,
-        ),
-    )
+    # obj = CSVCmp("./src/tests/test-data/random/")
+    # obj.only_in(
+    #     ParallelInputArgs(
+    #         left_input=["test2.csv"],
+    #         right_input=["test3.csv"],
+    #     ),
+    #     options=CommandOptions(
+    #         match_rows=True, 
+    #         enable_printing=True, 
+    #         add_save_timestamp=True,
+    #         align_columns=True,
+    #     ),
+    # )

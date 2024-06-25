@@ -3,10 +3,14 @@ from unittest import TestCase
 import pandas as pd
 
 from src.csvcmp import (
-    CsvCmp, 
+    CSVCmp, 
     CommandOptions,
     ParallelInput,
+    ParallelInputArgs,
 )
+
+
+
 
 
 class OnlyInTest(TestCase):
@@ -36,8 +40,8 @@ class OnlyInTest(TestCase):
             right_xlsx="test2.xlsx",
         )
 
-    def test_match_true_false_transform(self):
-        obj = CsvCmp(f"{self.test_set_folder}testset-2/", None)
+    def _test_match_rows_true_transform_helper(self):
+        obj = CSVCmp(f"{self.test_set_folder}testset-2/", None)
 
         def left_df_trans(df: pd.DataFrame) -> pd.DataFrame:
             def email_trans(row):
@@ -49,11 +53,13 @@ class OnlyInTest(TestCase):
             return df
 
         left_dfs, right_dfs = obj.only_in(
-            ["test1.csv"], 
-            ["test2.csv"], 
+            ParallelInputArgs(
+                ["test1.csv"], 
+                ["test2.csv"], 
+                left_trans_funcs=[left_df_trans],
+                right_trans_funcs=[lambda x: x],
+            ),
             CommandOptions(match_rows=True, enable_printing=False),
-            left_trans_funcs=[left_df_trans],
-            right_trans_funcs=[lambda x: x],
         )
 
         left_df = left_dfs[0]
@@ -70,6 +76,11 @@ class OnlyInTest(TestCase):
             'Email': ['brianharris33@example.com'],
             'Age': [33]
         }, index=[7])
+
+        return left_df, right_df, expected_left_df, expected_right_df
+
+    def test_match_rows_true_transform(self):
+        left_df, right_df, expected_left_df, expected_right_df = self._test_match_rows_true_transform_helper()
         
         self.assertTrue(left_df.equals(expected_left_df))
         self.assertTrue(right_df.equals(expected_right_df))
@@ -80,10 +91,12 @@ class OnlyInTest(TestCase):
             left_csv: str, 
             right_csv: str
         ):
-        obj = CsvCmp(input_dir, None)
+        obj = CSVCmp(input_dir, None)
         left_dfs, right_dfs = obj.only_in(
-            [left_csv], 
-            [right_csv], 
+            ParallelInputArgs(
+                [left_csv], 
+                [right_csv],
+            ), 
             CommandOptions(match_rows=True, enable_printing=False),
         )
 
@@ -106,10 +119,12 @@ class OnlyInTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
 
     def _test_match_rows_false_helper(self, input_dir: str, left_xlsx: str, right_xlsx: str):
-        obj = CsvCmp(input_dir, None)
+        obj = CSVCmp(input_dir, None)
         left_dfs, right_dfs = obj.only_in(
-            [left_xlsx], 
-            [right_xlsx], 
+            ParallelInputArgs(
+                [left_xlsx], 
+                [right_xlsx], 
+            ),
             CommandOptions(match_rows=False, enable_printing=False),
         )
 
@@ -136,10 +151,12 @@ class IntersectionTest(TestCase):
     test_set_folder = f"./src/tests/test-data/intersection/"
 
     def test_match_rows_true(self):
-        obj = CsvCmp(f"{self.test_set_folder}testset-1", None)
+        obj = CSVCmp(f"{self.test_set_folder}testset-1", None)
         left_dfs, right_dfs = obj.intersection(
-            ["test1.csv"], 
-            ["test2.csv"], 
+            ParallelInputArgs(
+                ["test1.csv"], 
+                ["test2.csv"], 
+            ),
             CommandOptions(match_rows=True, enable_printing=False),
         )
 
@@ -162,10 +179,12 @@ class IntersectionTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
 
     def test_match_rows_false(self):
-        obj = CsvCmp(f"{self.test_set_folder}testset-1", None)
+        obj = CSVCmp(f"{self.test_set_folder}testset-1", None)
         left_dfs, right_dfs = obj.intersection(
-            ["test1.csv"], 
-            ["test2.csv"], 
+            ParallelInputArgs(
+                ["test1.csv"], 
+                ["test2.csv"], 
+            ),
             CommandOptions(match_rows=False, enable_printing=False),
         )
 
@@ -193,8 +212,10 @@ class ParallelInputTest(TestCase):
 
     def test_columns_to_use(self):
         obj = ParallelInput(
-            left_input=["test1.csv"], 
-            right_input=["test1.csv"], 
+            ParallelInputArgs(
+                left_input=["test1.csv"], 
+                right_input=["test1.csv"], 
+            ),
             input_dir=f"{self.test_set_folder}",
             options=CommandOptions(columns_to_use=["column3", "column4"]),
         )
@@ -214,8 +235,10 @@ class ParallelInputTest(TestCase):
 
     def test_columns_to_ignore(self):
         obj = ParallelInput(
-            left_input=["test1.csv"], 
-            right_input=["test1.csv"], 
+            ParallelInputArgs(
+                left_input=["test1.csv"], 
+                right_input=["test1.csv"], 
+            ),
             input_dir=f"{self.test_set_folder}",
             options=CommandOptions(columns_to_ignore=["column3", "column4"]),
         )    
@@ -239,8 +262,10 @@ class ParallelInputTest(TestCase):
 
     def test_align_columns(self):
         obj = ParallelInput(
-            left_input=["test2.csv"], 
-            right_input=["test3.csv"], 
+            ParallelInputArgs(
+                left_input=["test2.csv"], 
+                right_input=["test3.csv"],    
+            ),
             input_dir=f"{self.test_set_folder}",
             options=CommandOptions(align_columns=True),
         )
