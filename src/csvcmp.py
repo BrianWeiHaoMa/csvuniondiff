@@ -105,6 +105,30 @@ class ParallelInputArgs:
     @pretty_format_dict
     def __str__(self):
         return self.__dict__
+    
+
+class ParallelInputRes:
+    def __init__(
+            self,
+            index: int,
+            left_df: pd.DataFrame,
+            right_df: pd.DataFrame,
+            left_df_trans: pd.DataFrame,
+            right_df_trans: pd.DataFrame,
+            columns_to_use: pd.Index,
+            left_name: str,
+            right_name: str,
+            data_save_file_extension: str,
+    ):
+        self.index = index
+        self.left_df = left_df
+        self.right_df = right_df
+        self.left_df_trans = left_df_trans
+        self.right_df_trans = right_df_trans
+        self.columns_to_use = columns_to_use
+        self.left_name = left_name
+        self.right_name = right_name
+        self.data_save_file_extension = data_save_file_extension
 
 
 class ParallelInput:
@@ -229,7 +253,7 @@ class ParallelInput:
             old_index = self.index
             self.index += 1
                 
-            return (
+            return ParallelInputRes(
                 old_index,
                 left_df,
                 right_df,
@@ -289,45 +313,29 @@ class CSVCmp:
         right_only_results = []
 
         parallel_input = ParallelInput(
-            ParallelInputArgs(
-                left_input=args.left_input,
-                right_input=args.right_input,
-                left_trans_funcs=args.left_trans_funcs,
-                right_trans_funcs=args.right_trans_funcs,
-                data_save_file_extensions=args.data_save_file_extensions,
-            ),
+            args,
             input_dir=self.input_dir,
             options=options,
         )
 
-        for (
-            i,
-            left_df,
-            right_df,
-            left_df_trans,
-            right_df_trans,
-            columns_to_use,
-            left_name,
-            right_name,
-            data_save_file_extension,
-        ) in parallel_input:
+        for p_data in parallel_input:
             left_data_save_file_name = (
-                f"{i}_only_in_" 
-                + self._get_file_name_no_extension(left_name)
-                + f".{data_save_file_extension}"
+                f"{p_data.index}_only_in_" 
+                + self._get_file_name_no_extension(p_data.left_name)
+                + f".{p_data.data_save_file_extension}"
             )
             right_data_save_file_name = (
-                f"{i}_only_in_" 
-                + self._get_file_name_no_extension(right_name)
-                + f".{data_save_file_extension}"
+                f"{p_data.index}_only_in_" 
+                + self._get_file_name_no_extension(p_data.right_name)
+                + f".{p_data.data_save_file_extension}"
             )
 
             if len(parallel_input) > 1:
-                LOGGER.info(f"For input pair {i}\n")
+                LOGGER.info(f"For input pair {p_data.index}\n")
 
             if options.match_rows:
-                left_value_counts = left_df_trans.value_counts(subset=columns_to_use.to_list())
-                right_value_counts = right_df_trans.value_counts(subset=columns_to_use.to_list())
+                left_value_counts = p_data.left_df_trans.value_counts(subset=p_data.columns_to_use.to_list())
+                right_value_counts = p_data.right_df_trans.value_counts(subset=p_data.columns_to_use.to_list())
 
                 shared = left_value_counts.index.intersection(right_value_counts.index)
 
@@ -339,27 +347,27 @@ class CSVCmp:
             
                 left_to_add_indices = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(left_extra).itertuples(index=True)):
-                    ind = left_df_trans[left_df_trans.isin(ind)].dropna().tail(count).index
+                    ind = p_data.left_df_trans[p_data.left_df_trans.isin(ind)].dropna().tail(count).index
                     left_to_add_indices = left_to_add_indices.append(ind)
 
                 right_to_add_indices = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(right_extra).itertuples(index=True)):
-                    ind = right_df_trans[right_df_trans.isin(ind)].dropna().tail(count).index
+                    ind = p_data.right_df_trans[p_data.right_df_trans.isin(ind)].dropna().tail(count).index
                     right_to_add_indices = right_to_add_indices.append(ind)
 
-                left_only_ind, right_only_ind = _get_left_and_right_only_ind(left_df_trans, right_df_trans, columns_to_use)
+                left_only_ind, right_only_ind = _get_left_and_right_only_ind(p_data.left_df_trans, p_data.right_df_trans, p_data.columns_to_use)
 
                 left_only_final_ind = left_only_ind.append(left_to_add_indices)
                 right_only_final_ind = right_only_ind.append(right_to_add_indices)
             else:
-                left_only_final_ind, right_only_final_ind = _get_left_and_right_only_ind(left_df_trans, right_df_trans, columns_to_use)
+                left_only_final_ind, right_only_final_ind = _get_left_and_right_only_ind(p_data.left_df_trans, p_data.right_df_trans, p_data.columns_to_use)
 
             if output_transformed_rows:
-                left_only_final = left_df.iloc[left_only_final_ind].sort_index()
-                right_only_final = right_df.iloc[right_only_final_ind].sort_index()
+                left_only_final = p_data.left_df.iloc[left_only_final_ind].sort_index()
+                right_only_final = p_data.right_df.iloc[right_only_final_ind].sort_index()
             else:
-                left_only_final = left_df_trans.iloc[left_only_final_ind].sort_index()
-                right_only_final = right_df_trans.iloc[right_only_final_ind].sort_index()
+                left_only_final = p_data.left_df_trans.iloc[left_only_final_ind].sort_index()
+                right_only_final = p_data.right_df_trans.iloc[right_only_final_ind].sort_index()
 
             def _only_in_format(
                 name: str, 
@@ -371,8 +379,8 @@ class CSVCmp:
                 left_only_final = left_only_final.drop_duplicates(keep="first")
                 right_only_final = right_only_final.drop_duplicates(keep="first")
 
-            LOGGER.info(_only_in_format(left_name, left_only_final))
-            LOGGER.info(_only_in_format(right_name, right_only_final))
+            LOGGER.info(_only_in_format(p_data.left_name, left_only_final))
+            LOGGER.info(_only_in_format(p_data.right_name, right_only_final))
             LOGGER.info("")
 
             if self.output_dir is not None:
@@ -409,45 +417,29 @@ class CSVCmp:
         right_results = []
 
         parallel_input = ParallelInput(
-            ParallelInputArgs(
-                left_input=args.left_input,
-                right_input=args.right_input,
-                left_trans_funcs=args.left_trans_funcs,
-                right_trans_funcs=args.right_trans_funcs,
-                data_save_file_extensions=args.data_save_file_extensions,
-            ),
+            args,
             input_dir=self.input_dir,
             options=options,
         )
 
-        for (
-            i,
-            left_df,
-            right_df,
-            left_df_trans,
-            right_df_trans,
-            columns_to_use,
-            left_name,
-            right_name,
-            data_save_file_extension,
-        ) in parallel_input:
+        for p_data in parallel_input:
             left_data_save_file_name = (
-                f"{i}_intersecting_" 
-                + self._get_file_name_no_extension(left_name)
-                + f".{data_save_file_extension}"
+                f"{p_data.index}_intersecting_" 
+                + self._get_file_name_no_extension(p_data.left_name)
+                + f".{p_data.data_save_file_extension}"
             )
             right_data_save_file_name = (
-                f"{i}_intersecting_" 
-                + self._get_file_name_no_extension(right_name)
-                + f".{data_save_file_extension}"
+                f"{p_data.index}_intersecting_" 
+                + self._get_file_name_no_extension(p_data.right_name)
+                + f".{p_data.data_save_file_extension}"
             )
 
             if len(parallel_input) > 1:
-                LOGGER.info(f"For input pair {i}\n")
+                LOGGER.info(f"For input pair {p_data.index}\n")
 
             if options.match_rows:
-                left_value_counts = left_df_trans.value_counts(sort=False, subset=columns_to_use.to_list())
-                right_value_counts = right_df_trans.value_counts(sort=False, subset=columns_to_use.to_list())
+                left_value_counts = p_data.left_df_trans.value_counts(sort=False, subset=p_data.columns_to_use.to_list())
+                right_value_counts = p_data.right_df_trans.value_counts(sort=False, subset=p_data.columns_to_use.to_list())
 
                 shared = left_value_counts.index.intersection(right_value_counts.index)
 
@@ -455,33 +447,33 @@ class CSVCmp:
             
                 left_final_ind = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(min_of_shared).itertuples(index=True)):
-                    ind = left_df_trans[left_df_trans.isin(ind)].dropna().head(count).index
+                    ind = p_data.left_df_trans[p_data.left_df_trans.isin(ind)].dropna().head(count).index
                     left_final_ind = left_final_ind.append(ind)
 
                 right_final_ind = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(min_of_shared).itertuples(index=True)):
-                    ind = right_df_trans[right_df_trans.isin(ind)].dropna().head(count).index
+                    ind = p_data.right_df_trans[p_data.right_df_trans.isin(ind)].dropna().head(count).index
                     right_final_ind = right_final_ind.append(ind)
             else:
-                left_df_trans_ind = left_df_trans.reset_index(names="_left_index")
-                right_df_trans_ind = right_df_trans.reset_index(names="_right_index")
+                left_df_trans_ind = p_data.left_df_trans.reset_index(names="_left_index")
+                right_df_trans_ind = p_data.right_df_trans.reset_index(names="_right_index")
 
                 merged_df = pd.merge(
                     left_df_trans_ind, 
                     right_df_trans_ind, 
                     how="inner", 
-                    on=columns_to_use.to_list(),
+                    on=p_data.columns_to_use.to_list(),
                 )
 
                 left_final_ind = pd.Index(merged_df["_left_index"].drop_duplicates())
                 right_final_ind = pd.Index(merged_df["_right_index"].drop_duplicates())
                 
             if output_transformed_rows:
-                left_final = left_df.iloc[left_final_ind].sort_index()
-                right_final = right_df.iloc[right_final_ind].sort_index()
+                left_final = p_data.left_df.iloc[left_final_ind].sort_index()
+                right_final = p_data.right_df.iloc[right_final_ind].sort_index()
             else:
-                left_final = left_df_trans.iloc[left_final_ind].sort_index()
-                right_final = right_df_trans.iloc[right_final_ind].sort_index()
+                left_final = p_data.left_df_trans.iloc[left_final_ind].sort_index()
+                right_final = p_data.right_df_trans.iloc[right_final_ind].sort_index()
 
             def _intersection_format(
                 name: str, 
@@ -493,8 +485,8 @@ class CSVCmp:
                 left_final = left_final.drop_duplicates(keep="first")
                 right_final = right_final.drop_duplicates(keep="first")
 
-            LOGGER.info(_intersection_format(left_name, left_final))
-            LOGGER.info(_intersection_format(right_name, right_final))
+            LOGGER.info(_intersection_format(p_data.left_name, left_final))
+            LOGGER.info(_intersection_format(p_data.right_name, right_final))
             LOGGER.info(f"")
 
             if self.output_dir is not None:
@@ -629,14 +621,17 @@ class CSVCmp:
             all_locals: dict,
         ) -> str:
         all_locals.pop("self")
+
         middle = ""
         for key, val in all_locals.items():
             string = f"{key}\n{"-" * len(key)}\n{str(val)}\n"
             middle += string
+
         indent = 4
         lines = middle.split("\n")
         shifted_lines = [' ' * indent + line for line in lines]
         middle = "\n".join(shifted_lines)
+        
         final_string = f"{func_name}(\n\n{middle}\n)\n"
         return final_string
 

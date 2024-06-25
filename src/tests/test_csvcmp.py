@@ -10,7 +10,16 @@ from src.csvcmp import (
 )
 
 
-
+class CommandRes:
+    def __init__(
+        self, 
+        obj: CSVCmp,
+        left_df: pd.DataFrame,  
+        right_df: pd.DataFrame, 
+        left_expected_df: pd.DataFrame,
+        right_expected_df: pd.DataFrame,       
+    ):
+        pass
 
 
 class OnlyInTest(TestCase):
@@ -220,18 +229,8 @@ class ParallelInputTest(TestCase):
             options=CommandOptions(columns_to_use=["column3", "column4"]),
         )
 
-        for (
-            i,
-            left_df,
-            right_df,
-            left_df_trans,
-            right_df_trans,
-            columns_to_use,
-            left_name,
-            right_name,
-            data_save_file_extension,
-        ) in obj:
-            self.assertTrue(columns_to_use.equals(pd.Index(["column3", "column4"])))
+        for p_data in obj:
+            self.assertTrue(p_data.columns_to_use.equals(pd.Index(["column3", "column4"])))
 
     def test_columns_to_ignore(self):
         obj = ParallelInput(
@@ -243,22 +242,12 @@ class ParallelInputTest(TestCase):
             options=CommandOptions(columns_to_ignore=["column3", "column4"]),
         )    
 
-        for (
-            i,
-            left_df,
-            right_df,
-            left_df_trans,
-            right_df_trans,
-            columns_to_use,
-            left_name,
-            right_name,
-            data_save_file_extension,
-        ) in obj:
-            self.assertTrue(columns_to_use.equals(pd.Index(["column1", "column2", "column5"])))
+        for p_data in obj:
+            self.assertTrue(p_data.columns_to_use.equals(pd.Index(["column1", "column2", "column5"])))
 
     def test_columns_to_use_and_ignore(self):
          with self.assertRaises(ValueError):
-             obj = CommandOptions(columns_to_use=["column3", "column4"], columns_to_ignore=["column3"])
+             CommandOptions(columns_to_use=["column3", "column4"], columns_to_ignore=["column3"])
 
     def test_align_columns(self):
         obj = ParallelInput(
@@ -270,17 +259,7 @@ class ParallelInputTest(TestCase):
             options=CommandOptions(align_columns=True),
         )
 
-        for (
-            i,
-            left_df,
-            right_df,
-            left_df_trans,
-            right_df_trans,
-            columns_to_use,
-            left_name,
-            right_name,
-            data_save_file_extension,
-        ) in obj:
-            self.assertTrue(columns_to_use.equals(pd.Index(["column1", "column2", "column3", "column4"])))
-            self.assertTrue(left_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4", "column5", "column6", "column7"])))
-            self.assertTrue(right_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4"])))
+        for p_data in obj:
+            self.assertTrue(p_data.columns_to_use.equals(pd.Index(["column1", "column2", "column3", "column4"])))
+            self.assertTrue(p_data.left_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4", "column5", "column6", "column7"])))
+            self.assertTrue(p_data.right_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4"])))
