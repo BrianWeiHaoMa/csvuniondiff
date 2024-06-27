@@ -7,106 +7,73 @@ from src.csvcmp import (
     CommandOptions,
     ParallelInput,
     ParallelInputArgs,
+    change_inputs_to_dfs,
 )
 
 
-class CommandRes:
-    def __init__(
-        self, 
-        obj: CSVCmp,
-        left_df: pd.DataFrame,  
-        right_df: pd.DataFrame, 
-        left_expected_df: pd.DataFrame,
-        right_expected_df: pd.DataFrame,       
-    ):
-        pass
+class PublicFunctionsTest(TestCase):
+    def test_change_inputs_to_dfs(self):
+        test_set_folder = "./src/tests/test-data/random/"
+
+        tmp_df = pd.DataFrame({
+            'A': [1, 2, 3, 4, 5],
+            'B': [6, 7, 8, 9, 10],
+            'C': [11, 12, 13, 14, 15],
+            'D': [16, 17, 18, 19, 20],
+            'E': [21, 22, 23, 24, 25]
+        })
+
+        test1_df = pd.read_csv(f"{test_set_folder}test1.csv")
+        test2_df = pd.read_csv(f"{test_set_folder}test2.csv")
+        test3_df = pd.read_csv(f"{test_set_folder}test3.csv")
+
+        first_dfs, second_dfs, third_dfs = change_inputs_to_dfs(
+            first_input=["test1.csv"],
+            second_input=["test2.csv"],
+            third_input=["test3.csv", tmp_df],
+            input_dir=test_set_folder,
+        )
+
+        self.assertTrue(test1_df.equals(first_dfs[0]))
+        self.assertTrue(test2_df.equals(second_dfs[0]))
+        self.assertTrue(test3_df.equals(third_dfs[0]))
+        self.assertTrue(tmp_df.equals(third_dfs[1]))
+        
+        test4_df = pd.read_csv(f"{test_set_folder}test4.csv")
+        test4_df_nulls_filled = test4_df.fillna("NULL")
+        
+        fourth_dfs = change_inputs_to_dfs(
+            first_input=["test4.csv"],
+            input_dir=test_set_folder,
+        )
+
+        self.assertTrue(test4_df_nulls_filled.equals(fourth_dfs[0]))
+
+        test4_df = pd.read_csv(f"{test_set_folder}test4.csv")
+        test4_df_nulls_dropped = test4_df.dropna()
+        
+        fourth_dfs = change_inputs_to_dfs(
+            first_input=["test4.csv"],
+            input_dir=test_set_folder,
+            drop_null=True,
+        )
+
+        self.assertTrue(test4_df_nulls_dropped.equals(fourth_dfs[0]))
 
 
 class OnlyInTest(TestCase):
     test_set_folder = f"./src/tests/test-data/only-in/"
 
     def test_match_rows_true(self):
-        self._test_match_rows_true_helper(
-            input_dir=f"{self.test_set_folder}testset-1/",
-            left_csv="test1.csv",
-            right_csv="test2.csv",
+        obj = CSVCmp(f"{self.test_set_folder}testset-1/", None)
+        parallel_input_args = ParallelInputArgs(
+            ["test1.csv"], 
+            ["test2.csv"],
         )
-        self._test_match_rows_true_helper(
-            input_dir=f"{self.test_set_folder}testset-3/",
-            left_csv="test1.xlsx",
-            right_csv="test2.xlsx",
-        )
-
-    def test_match_rows_false(self):
-        self._test_match_rows_false_helper(
-            input_dir=f"{self.test_set_folder}testset-1/",
-            left_xlsx="test1.csv",
-            right_xlsx="test2.csv",
-        )
-        self._test_match_rows_false_helper(
-            input_dir=f"{self.test_set_folder}testset-3/",
-            left_xlsx="test1.xlsx",
-            right_xlsx="test2.xlsx",
-        )
-
-    def _test_match_rows_true_transform_helper(self):
-        obj = CSVCmp(f"{self.test_set_folder}testset-2/", None)
-
-        def left_df_trans(df: pd.DataFrame) -> pd.DataFrame:
-            def email_trans(row):
-                arr = row["Email"].split("@")
-                return arr[0] + str(row["Age"]) + "@" + arr[1]
-            df["Email"] = df.apply(email_trans, axis=1)
-
-            df.reindex(columns=["Name", "Email", "Age"])
-            return df
-
+        options = CommandOptions(match_rows=True, enable_printing=False)
         left_dfs, right_dfs = obj.only_in(
-            ParallelInputArgs(
-                ["test1.csv"], 
-                ["test2.csv"], 
-                left_trans_funcs=[left_df_trans],
-                right_trans_funcs=[lambda x: x],
-            ),
-            CommandOptions(match_rows=True, enable_printing=False),
-        )
-
-        left_df = left_dfs[0]
-        right_df = right_dfs[0]
-
-        expected_left_df = pd.DataFrame({
-            'Name': ['Michael Brown', 'Sarah Wilson', 'David Thompson'],
-            'Age': [28, 32, 45],
-            'Email': ['michaelbrown28@example.com', 'sarahwilson32@example.com', 'davidthompson45@example.com']
-        }, index=[4, 5, 6])
-
-        expected_right_df = pd.DataFrame({
-            'Name': ['Brian Harris'],
-            'Email': ['brianharris33@example.com'],
-            'Age': [33]
-        }, index=[7])
-
-        return left_df, right_df, expected_left_df, expected_right_df
-
-    def test_match_rows_true_transform(self):
-        left_df, right_df, expected_left_df, expected_right_df = self._test_match_rows_true_transform_helper()
-        
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
-
-    def _test_match_rows_true_helper(
-            self, 
-            input_dir: str, 
-            left_csv: str, 
-            right_csv: str
-        ):
-        obj = CSVCmp(input_dir, None)
-        left_dfs, right_dfs = obj.only_in(
-            ParallelInputArgs(
-                [left_csv], 
-                [right_csv],
-            ), 
-            CommandOptions(match_rows=True, enable_printing=False),
+            parallel_input_args, 
+            options,
         )
 
         left_df = left_dfs[0]
@@ -126,15 +93,17 @@ class OnlyInTest(TestCase):
 
         self.assertTrue(left_df.equals(expected_left_df))
         self.assertTrue(right_df.equals(expected_right_df))
-
-    def _test_match_rows_false_helper(self, input_dir: str, left_xlsx: str, right_xlsx: str):
-        obj = CSVCmp(input_dir, None)
+        
+    def test_match_rows_false(self):
+        obj = CSVCmp(f"{self.test_set_folder}testset-1/", None)
+        parallel_input_args = ParallelInputArgs(
+            ["test1.csv"], 
+            ["test2.csv"], 
+        )
+        options = CommandOptions(match_rows=False, enable_printing=False)
         left_dfs, right_dfs = obj.only_in(
-            ParallelInputArgs(
-                [left_xlsx], 
-                [right_xlsx], 
-            ),
-            CommandOptions(match_rows=False, enable_printing=False),
+            parallel_input_args, 
+            options,
         )
 
         left_df = left_dfs[0]
@@ -154,6 +123,48 @@ class OnlyInTest(TestCase):
 
         self.assertTrue(left_df.equals(expected_left_df))
         self.assertTrue(right_df.equals(expected_right_df))
+    
+    def test_match_rows_true_transform(self):
+        obj = CSVCmp(f"{self.test_set_folder}testset-2/", None)
+
+        def left_df_trans(df: pd.DataFrame) -> pd.DataFrame:
+            def email_trans(row):
+                arr = row["Email"].split("@")
+                return arr[0] + str(row["Age"]) + "@" + arr[1]
+            df["Email"] = df.apply(email_trans, axis=1)
+
+            df.reindex(columns=["Name", "Email", "Age"])
+            return df
+
+        parallel_input_args = ParallelInputArgs(
+            ["test1.csv"], 
+            ["test2.csv"], 
+            left_trans_funcs=[left_df_trans],
+            right_trans_funcs=[lambda x: x],
+        )
+        options = CommandOptions(match_rows=True, enable_printing=False)
+        left_dfs, right_dfs = obj.only_in(
+            parallel_input_args,
+            options,
+        )
+
+        left_df = left_dfs[0]
+        right_df = right_dfs[0]
+
+        expected_left_df = pd.DataFrame({
+            'Name': ['Michael Brown', 'Sarah Wilson', 'David Thompson'],
+            'Age': [28, 32, 45],
+            'Email': ['michaelbrown28@example.com', 'sarahwilson32@example.com', 'davidthompson45@example.com']
+        }, index=[4, 5, 6])
+
+        expected_right_df = pd.DataFrame({
+            'Name': ['Brian Harris'],
+            'Email': ['brianharris33@example.com'],
+            'Age': [33]
+        }, index=[7])
+
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
 
 
 class IntersectionTest(TestCase):
@@ -161,12 +172,14 @@ class IntersectionTest(TestCase):
 
     def test_match_rows_true(self):
         obj = CSVCmp(f"{self.test_set_folder}testset-1", None)
+        parallel_input_args = ParallelInputArgs(
+            ["test1.csv"], 
+            ["test2.csv"], 
+        )
+        options = CommandOptions(match_rows=True, enable_printing=False)
         left_dfs, right_dfs = obj.intersection(
-            ParallelInputArgs(
-                ["test1.csv"], 
-                ["test2.csv"], 
-            ),
-            CommandOptions(match_rows=True, enable_printing=False),
+            parallel_input_args,
+            options,
         )
 
         left_df = left_dfs[0]
@@ -189,12 +202,14 @@ class IntersectionTest(TestCase):
 
     def test_match_rows_false(self):
         obj = CSVCmp(f"{self.test_set_folder}testset-1", None)
+        parallel_input_args = ParallelInputArgs(
+            ["test1.csv"], 
+            ["test2.csv"], 
+        )
+        options = CommandOptions(match_rows=False, enable_printing=False)
         left_dfs, right_dfs = obj.intersection(
-            ParallelInputArgs(
-                ["test1.csv"], 
-                ["test2.csv"], 
-            ),
-            CommandOptions(match_rows=False, enable_printing=False),
+            parallel_input_args,
+            options,
         )
 
         left_df = left_dfs[0]

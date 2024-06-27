@@ -1,5 +1,4 @@
-from collections.abc import Callable
-import json
+from collections.abc import Callable, Sequence
 import os
 import sys
 import logging
@@ -10,11 +9,11 @@ import numpy as np
 
 def change_inputs_to_dfs(
         first_input: list[str | pd.DataFrame], 
-        drop_null: bool = False,
+        drop_null: bool | None = False,
         fill_null: str | None = "NULL",
         input_dir: str | None = None,
         **kwargs,
-    ) -> tuple[list[pd.DataFrame], ...]:
+    ) -> list[pd.DataFrame] | tuple[list[pd.DataFrame], ...]:
     all_inputs = [first_input] + [input_ for input_ in kwargs.values()]
 
     for input_ in all_inputs:
@@ -41,11 +40,13 @@ def change_inputs_to_dfs(
                 if fill_null is not None:
                     input_[i] = input_[i].fillna(fill_null)
                 
+    if len(all_inputs) <= 1:
+        return all_inputs[0]
     return tuple(all_inputs)
 
-def pretty_format_dict(
-        func: Callable[[object], dict],
-    ) -> str:
+def _pretty_format_dict(
+        func,
+    ):
     def wrapper(*args, **kwargs):
         data = func(*args, **kwargs)
         res = ""
@@ -62,7 +63,7 @@ class CommandOptions:
             align_columns: bool | None = None,
             columns_to_use: list[str] | None = None,
             columns_to_ignore: list[str] | None = None,
-            fill_null: bool | None = None,
+            fill_null: str | None = None,
             drop_null: bool | None = None,
             match_rows: bool | None = None,
             enable_printing: bool | None = None,
@@ -79,11 +80,14 @@ class CommandOptions:
         self.add_save_timestamp = add_save_timestamp
         self.drop_duplicates = drop_duplicates
 
-        if columns_to_ignore is not None and columns_to_use is not None:
+        self.check()
+
+    def check(self) -> None:
+        if self.columns_to_ignore is not None and self.columns_to_use is not None:
             raise ValueError("Cannot have both columns_to_use and columns_to_ignore set")
 
-    @pretty_format_dict
-    def __str__(self):
+    @_pretty_format_dict
+    def __str__(self) -> dict:
         return self.__dict__
 
 
@@ -95,14 +99,16 @@ class ParallelInputArgs:
         left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
         right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
         data_save_file_extensions: list[str] | None = None,
+        output_transformed_rows: bool = False,
     ):
         self.left_input = left_input
         self.right_input = right_input
         self.left_trans_funcs = left_trans_funcs
         self.right_trans_funcs = right_trans_funcs
         self.data_save_file_extensions = data_save_file_extensions
+        self.output_transformed_rows = output_transformed_rows
 
-    @pretty_format_dict
+    @_pretty_format_dict
     def __str__(self):
         return self.__dict__
     
@@ -138,15 +144,20 @@ class ParallelInput:
             input_dir: str,
             options: CommandOptions = CommandOptions(),
         ):
-        left_input = data.left_input
-        right_input = data.right_input
+        if type(data.left_input) is str or type(data.left_input) is pd.DataFrame:
+            left_input = [data.left_input]
+        elif type(data.left_input) is list:
+            left_input = data.left_input
+
+        if type(data.right_input) is str or type(data.right_input) is pd.DataFrame:
+            right_input = [data.right_input]
+        elif type(data.right_input) is list:
+            right_input = data.right_input
+
         left_trans_funcs = data.left_trans_funcs
         right_trans_funcs = data.right_trans_funcs
         data_save_file_extensions = data.data_save_file_extensions
 
-        if type(left_input) != list:
-            left_input = [left_input]
-            right_input = [right_input]
         if len(left_input) != len(right_input):
             raise ValueError(f"The number of elements in left_input and right_input should be the same ({len(left_input)} != {len(right_input)})")
 
@@ -156,12 +167,14 @@ class ParallelInput:
             raise ValueError(f"The number of elements in data_save_file_extensions should be the same as the number of elements in left_input ({len(data_save_file_extensions)} != {len(left_input)})")
 
         if left_trans_funcs is None:
-            left_trans_funcs = [lambda x: x] * len(left_input)
+            left_f: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x
+            left_trans_funcs = [left_f] * len(left_input)
         if len(left_trans_funcs) != len(left_input):
             raise ValueError(f"The number of elements in left_trans_funcs should be the same as the number of elements in left_input ({len(left_trans_funcs)} != {len(left_input)})")
         
         if right_trans_funcs is None:
-            right_trans_funcs = [lambda x: x] * len(right_input)
+            right_f: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x
+            right_trans_funcs = [right_f] * len(right_input)
         if len(right_trans_funcs) != len(right_input):
             raise ValueError(f"The number of elements in right_trans_funcs should be the same as the number of elements in right_input ({len(right_trans_funcs)} != {len(right_input)})")
         
@@ -280,7 +293,6 @@ class CSVCmp:
             self, 
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
-            output_transformed_rows: bool = False,
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
             options=options,
@@ -320,18 +332,18 @@ class CSVCmp:
 
         for p_data in parallel_input:
             left_data_save_file_name = (
-                f"{p_data.index}_only_in_" 
+                f"({p_data.index}left)_only_in_" 
                 + self._get_file_name_no_extension(p_data.left_name)
                 + f".{p_data.data_save_file_extension}"
             )
             right_data_save_file_name = (
-                f"{p_data.index}_only_in_" 
+                f"({p_data.index}right)_only_in_" 
                 + self._get_file_name_no_extension(p_data.right_name)
                 + f".{p_data.data_save_file_extension}"
             )
 
             if len(parallel_input) > 1:
-                LOGGER.info(f"For input pair {p_data.index}\n")
+                LOGGER.info(f"For input pair {p_data.index}")
 
             if options.match_rows:
                 left_value_counts = p_data.left_df_trans.value_counts(subset=p_data.columns_to_use.to_list())
@@ -362,7 +374,7 @@ class CSVCmp:
             else:
                 left_only_final_ind, right_only_final_ind = _get_left_and_right_only_ind(p_data.left_df_trans, p_data.right_df_trans, p_data.columns_to_use)
 
-            if output_transformed_rows:
+            if args.output_transformed_rows:
                 left_only_final = p_data.left_df.iloc[left_only_final_ind].sort_index()
                 right_only_final = p_data.right_df.iloc[right_only_final_ind].sort_index()
             else:
@@ -381,7 +393,6 @@ class CSVCmp:
 
             LOGGER.info(_only_in_format(p_data.left_name, left_only_final))
             LOGGER.info(_only_in_format(p_data.right_name, right_only_final))
-            LOGGER.info("")
 
             if self.output_dir is not None:
                 self._output_to_file(
@@ -396,6 +407,7 @@ class CSVCmp:
                     df=right_only_final, 
                     logger=LOGGER,
                 )
+            LOGGER.info(f"")
 
             left_only_results.append(left_only_final)
             right_only_results.append(right_only_final)
@@ -405,7 +417,6 @@ class CSVCmp:
             self, 
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
-            output_transformed_rows: bool = False,
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
             options=options,
@@ -424,18 +435,18 @@ class CSVCmp:
 
         for p_data in parallel_input:
             left_data_save_file_name = (
-                f"{p_data.index}_intersecting_" 
+                f"({p_data.index}left)_intersecting_" 
                 + self._get_file_name_no_extension(p_data.left_name)
                 + f".{p_data.data_save_file_extension}"
             )
             right_data_save_file_name = (
-                f"{p_data.index}_intersecting_" 
+                f"({p_data.index}right)_intersecting_" 
                 + self._get_file_name_no_extension(p_data.right_name)
                 + f".{p_data.data_save_file_extension}"
             )
 
             if len(parallel_input) > 1:
-                LOGGER.info(f"For input pair {p_data.index}\n")
+                LOGGER.info(f"For input pair {p_data.index}")
 
             if options.match_rows:
                 left_value_counts = p_data.left_df_trans.value_counts(sort=False, subset=p_data.columns_to_use.to_list())
@@ -468,7 +479,7 @@ class CSVCmp:
                 left_final_ind = pd.Index(merged_df["_left_index"].drop_duplicates())
                 right_final_ind = pd.Index(merged_df["_right_index"].drop_duplicates())
                 
-            if output_transformed_rows:
+            if args.output_transformed_rows:
                 left_final = p_data.left_df.iloc[left_final_ind].sort_index()
                 right_final = p_data.right_df.iloc[right_final_ind].sort_index()
             else:
@@ -487,7 +498,6 @@ class CSVCmp:
 
             LOGGER.info(_intersection_format(p_data.left_name, left_final))
             LOGGER.info(_intersection_format(p_data.right_name, right_final))
-            LOGGER.info(f"")
 
             if self.output_dir is not None:
                 self._output_to_file(
@@ -502,6 +512,7 @@ class CSVCmp:
                     df=right_final, 
                     logger=LOGGER,
                 )
+            LOGGER.info(f"")
 
             left_results.append(left_final)
             right_results.append(right_final)
@@ -637,11 +648,25 @@ class CSVCmp:
 
 
 if __name__ == "__main__":
-    obj = CSVCmp("./src/tests/test-data/only-in/testset-1/")
+    # obj = CSVCmp("./src/tests/test-data/only-in/testset-1/")
+    # obj.only_in(
+    #     ParallelInputArgs(
+    #         left_input=["test1.csv"],
+    #         right_input=["test2.csv"],
+    #     ),
+    #     options=CommandOptions(
+    #         match_rows=False, 
+    #         enable_printing=True, 
+    #         add_save_timestamp=True,
+    #     ),
+    # )
+
+    obj = CSVCmp("./src/tests/test-data/different-file-types/")
     obj.only_in(
         ParallelInputArgs(
-            left_input=["test1.csv"],
-            right_input=["test2.csv"],
+            left_input=["0_only_in_test1.csv", "0_only_in_test1.xlsx", "0_only_in_test1.json", "0_only_in_test1.xml", "0_only_in_test1.html"],
+            right_input=["0_only_in_test2.csv", "0_only_in_test2.xlsx", "0_only_in_test2.json", "0_only_in_test2.xml", "0_only_in_test2.html"],
+            data_save_file_extensions=["csv"] * 5
         ),
         options=CommandOptions(
             match_rows=False, 
