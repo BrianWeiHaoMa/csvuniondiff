@@ -18,7 +18,7 @@ def change_inputs_to_dfs(
 
     for input_ in all_inputs:
         for i, val in enumerate(input_):
-            if type(val) == str:
+            if type(val) is str:
                 if input_dir:
                     val = os.path.join(input_dir, val)
 
@@ -94,8 +94,8 @@ class CommandOptions:
 class ParallelInputArgs:
     def __init__(
         self, 
-        left_input: list[str | pd.DataFrame] | str | pd.DataFrame,
-        right_input: list[str | pd.DataFrame] | str | pd.DataFrame,
+        left_input: list[str | pd.DataFrame],
+        right_input: list[str | pd.DataFrame],
         left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
         right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
         data_save_file_extensions: list[str] | None = None,
@@ -144,16 +144,8 @@ class ParallelInput:
             input_dir: str,
             options: CommandOptions = CommandOptions(),
         ):
-        if type(data.left_input) is str or type(data.left_input) is pd.DataFrame:
-            left_input = [data.left_input]
-        elif type(data.left_input) is list:
-            left_input = data.left_input
-
-        if type(data.right_input) is str or type(data.right_input) is pd.DataFrame:
-            right_input = [data.right_input]
-        elif type(data.right_input) is list:
-            right_input = data.right_input
-
+        left_input = data.left_input
+        right_input = data.right_input
         left_trans_funcs = data.left_trans_funcs
         right_trans_funcs = data.right_trans_funcs
         data_save_file_extensions = data.data_save_file_extensions
@@ -185,14 +177,18 @@ class ParallelInput:
         
         self.left_names = self.get_names(left_input)
         self.right_names = self.get_names(right_input)
+        
 
-        self.left_dfs, self.right_dfs = change_inputs_to_dfs(
+        dfs_res = change_inputs_to_dfs(
             first_input=left_input, 
             right_input=right_input,
             drop_null=options.drop_null,
             fill_null=options.fill_null,
             input_dir=input_dir,
         )
+
+        if type(dfs_res) is tuple:
+            self.left_dfs, self.right_dfs = dfs_res
 
         self.left_dfs_trans = [left_trans_funcs[i](self.left_dfs[i]) for i in range(self.length)]
         self.right_dfs_trans = [right_trans_funcs[i](self.right_dfs[i]) for i in range(self.length)]
@@ -201,13 +197,14 @@ class ParallelInput:
         
     def get_names(
             self,
-            inputs: list[str | pd.DataFrame] | str | pd.DataFrame,
+            inputs: list[str | pd.DataFrame],
         ) -> list[str]:
-        names = [
-            self.get_file_name(input_) 
-            if type(input_) == str 
-            else f"df_{i}_{input_.shape}" for i, input_ in enumerate(inputs)
-        ]
+        names = []
+        for i, input_ in enumerate(inputs):
+            if type(input_) is pd.DataFrame:
+                names.append(f"df_{i}_{input_.shape}")
+            elif type(input_) is str:
+                names.append(self.get_file_name(input_))
         return names
 
     def get_file_name(
@@ -385,7 +382,7 @@ class CSVCmp:
                 name: str, 
                 df: pd.DataFrame,
             ) -> str:
-                return f"Only in {name} {df.shape}:\n{df.head(50)}\n"
+                return f"Only in {name} {df.shape}:\n{df}\n"
             
             if options.drop_duplicates:
                 left_only_final = left_only_final.drop_duplicates(keep="first")
@@ -394,7 +391,7 @@ class CSVCmp:
             LOGGER.info(_only_in_format(p_data.left_name, left_only_final))
             LOGGER.info(_only_in_format(p_data.right_name, right_only_final))
 
-            if self.output_dir is not None:
+            if data_save_dir_path is not None:
                 self._output_to_file(
                     output_dir_path=data_save_dir_path,
                     file_name=left_data_save_file_name,
@@ -490,7 +487,7 @@ class CSVCmp:
                 name: str, 
                 df: pd.DataFrame,
             ) -> str:
-                return f"Intersecting rows from {name} {df.shape}:\n{df.head(50)}\n"
+                return f"Intersecting rows from {name} {df.shape}:\n{df}\n"
             
             if options.drop_duplicates:
                 left_final = left_final.drop_duplicates(keep="first")
@@ -499,7 +496,7 @@ class CSVCmp:
             LOGGER.info(_intersection_format(p_data.left_name, left_final))
             LOGGER.info(_intersection_format(p_data.right_name, right_final))
 
-            if self.output_dir is not None:
+            if data_save_dir_path is not None:
                 self._output_to_file(
                     output_dir_path=data_save_dir_path,
                     file_name=left_data_save_file_name,
@@ -524,13 +521,10 @@ class CSVCmp:
         command: Callable,
         local_vars: dict,
     ) -> tuple[logging.Logger, str | None]:
-        if self.output_dir is not None:
-            data_save_dir_path = self._make_output_dir(
-                command.__name__, 
-                add_timestamp=options.add_save_timestamp,
-            )
-        else: 
-            data_save_dir_path = None
+        data_save_dir_path = self._make_output_dir(
+            command.__name__, 
+            add_timestamp=options.add_save_timestamp,
+        )
 
         LOGGER = self._get_logger(
             enable_printing=options.enable_printing,
@@ -550,7 +544,7 @@ class CSVCmp:
     
     def _get_logger(
             self,
-            enable_printing: bool,
+            enable_printing: bool | None,
             output_dir: str | None,
             output_file_name: str,
             logger_name: str,
@@ -590,18 +584,20 @@ class CSVCmp:
     def _make_output_dir(
         self,
         save_sub_folder: str,
-        add_timestamp: bool = True,
-    ) -> str:
-        if add_timestamp:
-            data_save_dir_path = os.path.join(
-                self.output_dir, 
-                f"{save_sub_folder}{os.sep}{pd.Timestamp.now().strftime('%Y-%m-%d-%H%M%S')}",
-            )
-        else:
-            data_save_dir_path = os.path.join(self.output_dir, f"{save_sub_folder}{os.sep}results")
+        add_timestamp: bool | None = True,
+    ) -> str | None:
+        if self.output_dir is not None:
+            if add_timestamp:
+                data_save_dir_path = os.path.join(
+                    self.output_dir, 
+                    f"{save_sub_folder}{os.sep}{pd.Timestamp.now().strftime('%Y-%m-%d-%H%M%S')}",
+                )
+            else:
+                data_save_dir_path = os.path.join(self.output_dir, f"{save_sub_folder}{os.sep}results")
 
-        os.makedirs(data_save_dir_path, exist_ok=True)
-        return data_save_dir_path
+            os.makedirs(data_save_dir_path, exist_ok=True)
+            return data_save_dir_path
+        return None
         
     def _output_to_file(
         self, 
