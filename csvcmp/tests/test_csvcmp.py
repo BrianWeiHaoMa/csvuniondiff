@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import pandas as pd
 
-from src.csvcmp import (
+from csvcmp.csvcmp import (
     CSVCmp, 
     CommandOptions,
     ParallelInput,

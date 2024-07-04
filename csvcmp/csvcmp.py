@@ -177,7 +177,6 @@ class ParallelInput:
         
         self.left_names = self.get_names(left_input)
         self.right_names = self.get_names(right_input)
-        
 
         dfs_res = change_inputs_to_dfs(
             first_input=left_input, 
@@ -644,25 +643,11 @@ class CSVCmp:
 
 
 if __name__ == "__main__":
-    # obj = CSVCmp("./src/tests/test-data/only-in/testset-1/")
-    # obj.only_in(
-    #     ParallelInputArgs(
-    #         left_input=["test1.csv"],
-    #         right_input=["test2.csv"],
-    #     ),
-    #     options=CommandOptions(
-    #         match_rows=False, 
-    #         enable_printing=True, 
-    #         add_save_timestamp=True,
-    #     ),
-    # )
-
-    obj = CSVCmp("./src/tests/test-data/different-file-types/")
+    obj = CSVCmp("./csvcmp/tests/test-data/only-in/testset-1/")
     obj.only_in(
         ParallelInputArgs(
-            left_input=["0_only_in_test1.csv", "0_only_in_test1.xlsx", "0_only_in_test1.json", "0_only_in_test1.xml", "0_only_in_test1.html"],
-            right_input=["0_only_in_test2.csv", "0_only_in_test2.xlsx", "0_only_in_test2.json", "0_only_in_test2.xml", "0_only_in_test2.html"],
-            data_save_file_extensions=["csv"] * 5
+            left_input=["test1.csv"],
+            right_input=["test2.csv"],
         ),
         options=CommandOptions(
             match_rows=False, 
@@ -671,7 +656,21 @@ if __name__ == "__main__":
         ),
     )
 
-    # obj = CSVCmp("./src/tests/test-data/intersection/testset-1/")
+    # obj = CSVCmp("./csvcmp/tests/test-data/different-file-types/")
+    # obj.only_in(
+    #     ParallelInputArgs(
+    #         left_input=["0_only_in_test1.csv", "0_only_in_test1.xlsx", "0_only_in_test1.json", "0_only_in_test1.xml", "0_only_in_test1.html"],
+    #         right_input=["0_only_in_test2.csv", "0_only_in_test2.xlsx", "0_only_in_test2.json", "0_only_in_test2.xml", "0_only_in_test2.html"],
+    #         data_save_file_extensions=["csv"] * 5
+    #     ),
+    #     options=CommandOptions(
+    #         match_rows=False, 
+    #         enable_printing=True, 
+    #         add_save_timestamp=True,
+    #     ),
+    # )
+
+    # obj = CSVCmp("./csvcmp/tests/test-data/intersection/testset-1/")
     # obj.intersection(
     #     ParallelInputArgs(
     #         left_input=["test1.csv"],
@@ -685,7 +684,7 @@ if __name__ == "__main__":
     #     ),
     # )
     
-    # obj = CSVCmp("./src/tests/test-data/random/")
+    # obj = CSVCmp("./csvcmp/tests/test-data/random/")
     # obj.only_in(
     #     ParallelInputArgs(
     #         left_input=["test2.csv"],

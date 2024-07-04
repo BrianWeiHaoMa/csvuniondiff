@@ -3,3 +3,6 @@ __pycache__
 .venv
 csvcmp-data
 tmp.txt
+.mypy_cache
+csvcmp.egg-info
+dist
