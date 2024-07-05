@@ -13,7 +13,7 @@ from csvcmp.csvcmp import (
 
 class PublicFunctionsTest(TestCase):
     def test_change_inputs_to_dfs(self):
-        test_set_folder = "./src/tests/test-data/random/"
+        test_set_folder = "./csvcmp/tests/test-data/random/"
 
         tmp_df = pd.DataFrame({
             'A': [1, 2, 3, 4, 5],
@@ -45,6 +45,7 @@ class PublicFunctionsTest(TestCase):
         fourth_dfs = change_inputs_to_dfs(
             first_input=["test4.csv"],
             input_dir=test_set_folder,
+            fill_null="NULL",
         )
 
         self.assertTrue(test4_df_nulls_filled.equals(fourth_dfs[0]))
@@ -62,7 +63,7 @@ class PublicFunctionsTest(TestCase):
 
 
 class OnlyInTest(TestCase):
-    test_set_folder = f"./src/tests/test-data/only-in/"
+    test_set_folder = f"./csvcmp/tests/test-data/only-in/"
 
     def test_match_rows_true(self):
         obj = CSVCmp(f"{self.test_set_folder}testset-1/", None)
@@ -168,7 +169,7 @@ class OnlyInTest(TestCase):
 
 
 class IntersectionTest(TestCase):
-    test_set_folder = f"./src/tests/test-data/intersection/"
+    test_set_folder = f"./csvcmp/tests/test-data/intersection/"
 
     def test_match_rows_true(self):
         obj = CSVCmp(f"{self.test_set_folder}testset-1", None)
@@ -232,7 +233,7 @@ class IntersectionTest(TestCase):
 
 
 class ParallelInputTest(TestCase):
-    test_set_folder = f"./src/tests/test-data/random/"
+    test_set_folder = f"./csvcmp/tests/test-data/random/"
 
     def test_columns_to_use(self):
         obj = ParallelInput(

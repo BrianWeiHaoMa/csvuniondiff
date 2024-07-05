@@ -22,16 +22,16 @@ class CommandLineParser:
     def get_argument_parser(self):
         argument_parser = ArgumentParser(description="csvcmp command line parser")
 
-        argument_parser.add_argument("--only-in", nargs="+", help="use the only-in command, takes 2 files as arguments")
-        argument_parser.add_argument("--intersection", nargs="+", help="use the intersection command, takes 2 files as arguments")
+        argument_parser.add_argument("--only-in", nargs=2, help="use the only-in command, takes 2 files as arguments")
+        argument_parser.add_argument("--intersection", nargs=2, help="use the intersection command, takes 2 files as arguments")
 
         argument_parser.add_argument("--align-columns", action="count", help="if column names are not aligned in csv, but both have same column names, realigns the column names to match")
-        argument_parser.add_argument("--columns-to-use", default=[], nargs="+", help="only use these columns for comparison")
-        argument_parser.add_argument("--columns-to-ignore", default=[], nargs="+", help="do not use these columns for comparison")
+        argument_parser.add_argument("--columns-to-use", default=[], nargs="*", help="only use these columns for comparison")
+        argument_parser.add_argument("--columns-to-ignore", default=[], nargs="*", help="do not use these columns for comparison")
         argument_parser.add_argument("--fill-null", nargs="?", const="NULL", type=str, help="fills null with 'NULL' so that they can be compared")
         argument_parser.add_argument("--drop-null", action="count", help="drop rows with nulls")
         argument_parser.add_argument("--drop-duplicates", action="count", help="drop duplicates")
-        argument_parser.add_argument("--input-dir", default=f".{os.sep}", type=str, help="use this dir as the base for the path to the files")
+        argument_parser.add_argument("--input-dir", default=f"{os.sep}", type=str, help="use this dir as the base for the path to the files")
         argument_parser.add_argument("--output-dir", type=str, help="use this dir as the base for the outputs of the script")
         argument_parser.add_argument("--match-rows", action="count", help="use the match rows method with the command")
 

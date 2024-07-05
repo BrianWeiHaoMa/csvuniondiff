@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 import os
 import sys
 import logging
@@ -9,9 +9,9 @@ import numpy as np
 
 def change_inputs_to_dfs(
         first_input: list[str | pd.DataFrame], 
-        drop_null: bool | None = False,
-        fill_null: str | None = "NULL",
-        input_dir: str | None = None,
+        drop_null: bool = False,
+        fill_null: str | None = None,
+        input_dir: str = f".{os.sep}",
         **kwargs,
     ) -> list[pd.DataFrame] | tuple[list[pd.DataFrame], ...]:
     all_inputs = [first_input] + [input_ for input_ in kwargs.values()]
@@ -60,15 +60,15 @@ def _pretty_format_dict(
 class CommandOptions:
     def __init__(
             self,
-            align_columns: bool | None = None,
+            align_columns: bool = False,
             columns_to_use: list[str] | None = None,
             columns_to_ignore: list[str] | None = None,
             fill_null: str | None = None,
-            drop_null: bool | None = None,
-            match_rows: bool | None = None,
-            enable_printing: bool | None = None,
-            add_save_timestamp: bool | None = None,
-            drop_duplicates: bool | None = None,
+            drop_null: bool = False,
+            match_rows: bool = True,
+            enable_printing: bool = True,
+            add_save_timestamp: bool = False,
+            drop_duplicates: bool = False,
         ):
         self.align_columns = align_columns
         self.columns_to_use = columns_to_use
@@ -82,9 +82,9 @@ class CommandOptions:
 
         self.check()
 
-    def check(self) -> None:
-        if self.columns_to_ignore is not None and self.columns_to_use is not None:
-            raise ValueError("Cannot have both columns_to_use and columns_to_ignore set")
+    def check(self):
+        if self.columns_to_use is not None and self.columns_to_ignore is not None:
+            raise ValueError("Only one of columns_to_use and columns_to_ignore should be used")
 
     @_pretty_format_dict
     def __str__(self) -> dict:
@@ -96,9 +96,9 @@ class ParallelInputArgs:
         self, 
         left_input: list[str | pd.DataFrame],
         right_input: list[str | pd.DataFrame],
-        left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-        right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame] | Callable[[object], object]] | None = None,
-        data_save_file_extensions: list[str] | None = None,
+        left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] = [],
+        right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] = [],
+        data_save_file_extensions: list[str] = [],
         output_transformed_rows: bool = False,
     ):
         self.left_input = left_input
@@ -153,18 +153,18 @@ class ParallelInput:
         if len(left_input) != len(right_input):
             raise ValueError(f"The number of elements in left_input and right_input should be the same ({len(left_input)} != {len(right_input)})")
 
-        if data_save_file_extensions is None:
+        if data_save_file_extensions == []:
             data_save_file_extensions = ["csv"] * len(left_input)
         if len(data_save_file_extensions) != len(left_input):
             raise ValueError(f"The number of elements in data_save_file_extensions should be the same as the number of elements in left_input ({len(data_save_file_extensions)} != {len(left_input)})")
 
-        if left_trans_funcs is None:
+        if left_trans_funcs == []:
             left_f: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x
             left_trans_funcs = [left_f] * len(left_input)
         if len(left_trans_funcs) != len(left_input):
             raise ValueError(f"The number of elements in left_trans_funcs should be the same as the number of elements in left_input ({len(left_trans_funcs)} != {len(left_input)})")
         
-        if right_trans_funcs is None:
+        if right_trans_funcs == []:
             right_f: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x
             right_trans_funcs = [right_f] * len(right_input)
         if len(right_trans_funcs) != len(right_input):
