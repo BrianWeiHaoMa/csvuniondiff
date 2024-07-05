@@ -353,14 +353,16 @@ class CSVCmp:
                 left_extra = shared_left_sub_right[shared_left_sub_right > 0]
                 right_extra = shared_right_sub_left[shared_right_sub_left > 0]
             
+                left_df_tmp = p_data.left_df_trans[p_data.columns_to_use.to_list()] 
                 left_to_add_indices = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(left_extra).itertuples(index=True)):
-                    ind = p_data.left_df_trans[p_data.left_df_trans.isin(ind)].dropna().tail(count).index
+                    ind = left_df_tmp[left_df_tmp.isin(ind)].dropna().tail(count).index
                     left_to_add_indices = left_to_add_indices.append(ind)
 
+                right_df_tmp = p_data.right_df_trans[p_data.columns_to_use.to_list()]
                 right_to_add_indices = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(right_extra).itertuples(index=True)):
-                    ind = p_data.right_df_trans[p_data.right_df_trans.isin(ind)].dropna().tail(count).index
+                    ind = right_df_tmp[right_df_tmp.isin(ind)].dropna().tail(count).index
                     right_to_add_indices = right_to_add_indices.append(ind)
 
                 left_only_ind, right_only_ind = _get_left_and_right_only_ind(p_data.left_df_trans, p_data.right_df_trans, p_data.columns_to_use)
@@ -452,14 +454,16 @@ class CSVCmp:
 
                 min_of_shared = np.minimum(left_value_counts[shared], right_value_counts[shared])
             
+                left_df_tmp = p_data.left_df_trans[p_data.columns_to_use.to_list()]
                 left_final_ind = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(min_of_shared).itertuples(index=True)):
-                    ind = p_data.left_df_trans[p_data.left_df_trans.isin(ind)].dropna().head(count).index
+                    ind = left_df_tmp[left_df_tmp.isin(ind)].dropna().head(count).index
                     left_final_ind = left_final_ind.append(ind)
 
+                right_df_tmp = p_data.right_df_trans[p_data.columns_to_use.to_list()]
                 right_final_ind = pd.Index([], dtype=int)
                 for ind, count in list(pd.DataFrame(min_of_shared).itertuples(index=True)):
-                    ind = p_data.right_df_trans[p_data.right_df_trans.isin(ind)].dropna().head(count).index
+                    ind = right_df_tmp[right_df_tmp.isin(ind)].dropna().head(count).index
                     right_final_ind = right_final_ind.append(ind)
             else:
                 left_df_trans_ind = p_data.left_df_trans.reset_index(names="_left_index")
@@ -531,6 +535,8 @@ class CSVCmp:
             output_file_name=f"{command.__name__}.log",
             logger_name=command.__name__,
         )
+
+        LOGGER.info(f"Input directory: {self.input_dir}\n")
 
         LOGGER.info(
             self._get_function_info_string(

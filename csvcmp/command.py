@@ -26,8 +26,8 @@ class CommandLineParser:
         argument_parser.add_argument("--intersection", nargs=2, help="use the intersection command, takes 2 files as arguments")
 
         argument_parser.add_argument("--align-columns", action="count", help="if column names are not aligned in csv, but both have same column names, realigns the column names to match")
-        argument_parser.add_argument("--columns-to-use", default=[], nargs="*", help="only use these columns for comparison")
-        argument_parser.add_argument("--columns-to-ignore", default=[], nargs="*", help="do not use these columns for comparison")
+        argument_parser.add_argument("--columns-to-use", default=None, nargs="+", help="only use these columns for comparison")
+        argument_parser.add_argument("--columns-to-ignore", default=None, nargs="+", help="do not use these columns for comparison")
         argument_parser.add_argument("--fill-null", nargs="?", const="NULL", type=str, help="fills null with 'NULL' so that they can be compared")
         argument_parser.add_argument("--drop-null", action="count", help="drop rows with nulls")
         argument_parser.add_argument("--drop-duplicates", action="count", help="drop duplicates")
@@ -103,22 +103,22 @@ class CommandLineParser:
     def parse_match_rows(self) -> bool:
         match_rows = self.args.match_rows
         return True if match_rows is not None else False
-
-
-    # only_in = parsed_args.only_in
-    # intersection = parsed_args.intersection
-    # align_columns = parsed_args.align_columns
-    # columns_to_use = parsed_args.columns_to_use
-    # columns_to_ignore = parsed_args.columns_to_ignore
-    # fill_null = parsed_args.fill_null
-    # drop_null = parsed_args.drop_null
-    # drop_duplicates = parsed_args.drop_duplicates
-    # input_dir = parsed_args.input_dir
-    # output_dir = parsed_args.output_dir
-    # match_rows = parsed_args.match_rows
+    
 
 if __name__ == "__main__":
-    
+    command_line_parser = CommandLineParser(args=sys.argv[1:])
+
+    only_in = command_line_parser.parse_only_in()
+    intersection = command_line_parser.parse_intersection()
+    align_columns = command_line_parser.parse_align_columns()
+    columns_to_use = command_line_parser.parse_columns_to_use()
+    columns_to_ignore = command_line_parser.parse_columns_to_ignore()
+    fill_null = command_line_parser.parse_fill_null()
+    drop_null = command_line_parser.parse_drop_null()
+    drop_duplicates = command_line_parser.parse_drop_duplicates()
+    input_dir = command_line_parser.parse_input_dir()
+    output_dir = command_line_parser.parse_output_dir()
+    match_rows = command_line_parser.parse_match_rows()
 
     commands_count = 0
     if only_in is not None:
@@ -142,41 +142,33 @@ if __name__ == "__main__":
         columns_to_ignore=columns_to_ignore,
         fill_null=fill_null,
         drop_null=drop_null,
-        match_rows=True if match_rows is not None else False,
+        match_rows=match_rows,
         enable_printing=True,
         add_save_timestamp=True,
         drop_duplicates=drop_duplicates,
     )
 
     if only_in is not None:
-        check_for_two_files(
-            only_in,
-            "only-in"
-        )
         csvcmp.only_in(
             ParallelInputArgs(
                 left_input=[only_in[0]],
                 right_input=[only_in[1]],
-                left_trans_funcs=None,
-                right_trans_funcs=None,
-                data_save_file_extensions=None,
+                left_trans_funcs=[],
+                right_trans_funcs=[],
+                data_save_file_extensions=[],
                 output_transformed_rows=False,
             ),
             options=options,
         )
 
     if intersection is not None:
-        check_for_two_files(
-            intersection,
-            "intersection"
-        )
         csvcmp.intersection(
             ParallelInputArgs(
                 left_input=[intersection[0]],
                 right_input=[intersection[1]],
-                left_trans_funcs=None,
-                right_trans_funcs=None,
-                data_save_file_extensions=None,
+                left_trans_funcs=[],
+                right_trans_funcs=[],
+                data_save_file_extensions=[],
                 output_transformed_rows=False,
             ),
             options=options,

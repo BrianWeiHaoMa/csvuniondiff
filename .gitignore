@@ -5,4 +5,5 @@ csvcmp-data
 tmp.txt
 .mypy_cache
 csvcmp.egg-info
-dist
+dists
+.vscode
