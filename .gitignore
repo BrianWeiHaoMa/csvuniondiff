@@ -7,3 +7,7 @@ tmp.txt
 csvcmp.egg-info
 dists
 .vscode
+build
+test_venv
+csvuniondiff.egg-info
+.test_venv

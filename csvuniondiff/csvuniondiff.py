@@ -61,30 +61,40 @@ class CommandOptions:
     def __init__(
             self,
             align_columns: bool = False,
-            columns_to_use: list[str] | None = None,
-            columns_to_ignore: list[str] | None = None,
+            use_columns: list[str] | None = None,
+            ignore_columns: list[str] | None = None,
             fill_null: str | None = None,
             drop_null: bool = False,
             match_rows: bool = True,
             enable_printing: bool = True,
             add_save_timestamp: bool = False,
             drop_duplicates: bool = False,
+            keep_columns: list[str] | None = None,
+            use_common_columns: bool = False,
         ):
         self.align_columns = align_columns
-        self.columns_to_use = columns_to_use
-        self.columns_to_ignore = columns_to_ignore
+        self.use_columns = use_columns
+        self.ignore_columns = ignore_columns
         self.fill_null = fill_null
         self.drop_null = drop_null
         self.match_rows = match_rows
         self.enable_printing = enable_printing
         self.add_save_timestamp = add_save_timestamp
         self.drop_duplicates = drop_duplicates
+        self.keep_columns = keep_columns
+        self.use_common_columns = use_common_columns
 
         self.check()
 
     def check(self):
-        if self.columns_to_use is not None and self.columns_to_ignore is not None:
-            raise ValueError("Only one of columns_to_use and columns_to_ignore should be used")
+        if self.use_columns is not None and self.ignore_columns is not None:
+            raise ValueError("Only one of use_columns and ignore_columns should be used")
+        
+        if self.use_columns is not None and self.use_common_columns:
+            raise ValueError("Only one of use_columns and use_common_columns should be used")
+        
+        if self.ignore_columns is not None and self.use_common_columns:
+            raise ValueError("Only one of ignore_columns and use_common_columns should be used")
 
     @_pretty_format_dict
     def __str__(self) -> dict:
@@ -219,8 +229,8 @@ class ParallelInput:
             right_df: pd.DataFrame,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         common_columns = left_df.columns.intersection(right_df.columns, sort=True)
-        left_only_columns = left_df.columns.difference(common_columns)
-        right_only_columns = right_df.columns.difference(common_columns)
+        left_only_columns = left_df.columns.difference(common_columns, sort=False)
+        right_only_columns = right_df.columns.difference(common_columns, sort=False)
         left_df = left_df[common_columns.append(left_only_columns)]
         right_df = right_df[common_columns.append(right_only_columns)]
         return left_df, right_df
@@ -241,19 +251,24 @@ class ParallelInput:
             right_name = self.right_names[self.index]
             data_save_file_extension = self.data_save_file_extensions[self.index]
 
-            if self.options.columns_to_use is not None:
-                columns_to_use = pd.Index(self.options.columns_to_use)
-            elif self.options.columns_to_ignore is not None:
-                columns_to_ignore = pd.Index(self.options.columns_to_ignore)
-                
+            if self.options.use_columns is not None:
+                columns_to_use = pd.Index(self.options.use_columns)
+            elif self.options.ignore_columns is not None:
+                columns_to_ignore = pd.Index(self.options.ignore_columns)
+
                 left_columns_to_use = left_df_trans.columns.difference(columns_to_ignore)
                 right_columns_to_use = right_df_trans.columns.difference(columns_to_ignore)
                 if left_columns_to_use.difference(right_columns_to_use).size > 0:
-                    raise ValueError(f"Final left and right dfs do not both have the given columns")
+                    raise ValueError(f"left and right columns to use aren't the same after ignoring columns")
                 
                 columns_to_use = left_columns_to_use
-            else:
+            elif self.options.use_common_columns:
                 columns_to_use = left_df_trans.columns.intersection(right_df_trans.columns)
+            else:
+                if left_df_trans.columns.to_list() != right_df_trans.columns.to_list():
+                    raise ValueError(f"left and right columns aren't the same")
+                
+                columns_to_use = left_df_trans.columns
             
             if self.options.align_columns:
                 left_df, right_df = self.align_columns(left_df, right_df)
@@ -276,7 +291,7 @@ class ParallelInput:
         raise StopIteration        
 
 
-class CSVCmp:
+class CSVUnionDiff:
     def __init__(
             self, 
             input_dir: str = "./",
@@ -285,14 +300,14 @@ class CSVCmp:
         self.input_dir = input_dir
         self.output_dir = output_dir
 
-    def only_in(
+    def diff(
             self, 
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
             options=options,
-            command=self.only_in,
+            command=self.diff,
             local_vars=locals(),
         )
 
@@ -379,7 +394,7 @@ class CSVCmp:
                 left_only_final = p_data.left_df_trans.iloc[left_only_final_ind].sort_index()
                 right_only_final = p_data.right_df_trans.iloc[right_only_final_ind].sort_index()
 
-            def _only_in_format(
+            def _diff_format(
                 name: str, 
                 df: pd.DataFrame,
             ) -> str:
@@ -389,8 +404,14 @@ class CSVCmp:
                 left_only_final = left_only_final.drop_duplicates(keep="first")
                 right_only_final = right_only_final.drop_duplicates(keep="first")
 
-            LOGGER.info(_only_in_format(p_data.left_name, left_only_final))
-            LOGGER.info(_only_in_format(p_data.right_name, right_only_final))
+            if options.keep_columns is not None:
+                left_columns = pd.Index(options.keep_columns).intersection(left_only_final.columns)
+                right_columns = pd.Index(options.keep_columns).intersection(right_only_final.columns)
+                left_only_final = left_only_final[left_columns]
+                right_only_final = right_only_final[right_columns]
+
+            LOGGER.info(_diff_format(p_data.left_name, left_only_final))
+            LOGGER.info(_diff_format(p_data.right_name, right_only_final))
 
             if data_save_dir_path is not None:
                 self._output_to_file(
@@ -411,14 +432,14 @@ class CSVCmp:
             right_only_results.append(right_only_final)
         return left_only_results, right_only_results
     
-    def intersection(
+    def union(
             self, 
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
         LOGGER, data_save_dir_path = self._setup(
             options=options,
-            command=self.intersection,
+            command=self.union,
             local_vars=locals(),
         )
 
@@ -486,7 +507,7 @@ class CSVCmp:
                 left_final = p_data.left_df_trans.iloc[left_final_ind].sort_index()
                 right_final = p_data.right_df_trans.iloc[right_final_ind].sort_index()
 
-            def _intersection_format(
+            def _union_format(
                 name: str, 
                 df: pd.DataFrame,
             ) -> str:
@@ -496,8 +517,14 @@ class CSVCmp:
                 left_final = left_final.drop_duplicates(keep="first")
                 right_final = right_final.drop_duplicates(keep="first")
 
-            LOGGER.info(_intersection_format(p_data.left_name, left_final))
-            LOGGER.info(_intersection_format(p_data.right_name, right_final))
+            if options.keep_columns is not None:
+                left_columns = pd.Index(options.keep_columns).intersection(left_final.columns)
+                right_columns = pd.Index(options.keep_columns).intersection(right_final.columns)
+                left_final = left_final[left_columns]
+                right_final = right_final[right_columns]
+
+            LOGGER.info(_union_format(p_data.left_name, left_final))
+            LOGGER.info(_union_format(p_data.right_name, right_final))
 
             if data_save_dir_path is not None:
                 self._output_to_file(
@@ -524,9 +551,16 @@ class CSVCmp:
         command: Callable,
         local_vars: dict,
     ) -> tuple[logging.Logger, str | None]:
+        current_time = pd.Timestamp.now()
+
+        if options.add_save_timestamp:
+            inner_folder = current_time.strftime("%Y-%m-%d-%H%M%S")
+        else:
+            inner_folder = None
+
         data_save_dir_path = self._make_output_dir(
-            command.__name__, 
-            add_timestamp=options.add_save_timestamp,
+            save_sub_folder=command.__name__, 
+            timestamp_str=inner_folder,
         )
 
         LOGGER = self._get_logger(
@@ -536,6 +570,7 @@ class CSVCmp:
             logger_name=command.__name__,
         )
 
+        LOGGER.info(f"Timestamp: {current_time}\n")
         LOGGER.info(f"Input directory: {self.input_dir}\n")
 
         LOGGER.info(
@@ -562,7 +597,7 @@ class CSVCmp:
             logger.addHandler(stream_handler)
         
         if output_dir is not None:
-            file_handler = logging.FileHandler(os.path.join(output_dir, output_file_name))
+            file_handler = logging.FileHandler(os.path.join(output_dir, output_file_name), mode="w")
             file_handler.setLevel(logging.DEBUG)
             logger.addHandler(file_handler)
         
@@ -589,13 +624,13 @@ class CSVCmp:
     def _make_output_dir(
         self,
         save_sub_folder: str,
-        add_timestamp: bool | None = True,
+        timestamp_str: str | None,
     ) -> str | None:
         if self.output_dir is not None:
-            if add_timestamp:
+            if timestamp_str is not None:
                 data_save_dir_path = os.path.join(
                     self.output_dir, 
-                    f"{save_sub_folder}{os.sep}{pd.Timestamp.now().strftime('%Y-%m-%d-%H%M%S')}",
+                    f"{save_sub_folder}{os.sep}{timestamp_str}",
                 )
             else:
                 data_save_dir_path = os.path.join(self.output_dir, f"{save_sub_folder}{os.sep}results")
@@ -649,8 +684,8 @@ class CSVCmp:
 
 
 if __name__ == "__main__":
-    obj = CSVCmp("./csvcmp/tests/test-data/only-in/testset-1/")
-    obj.only_in(
+    obj = CSVUnionDiff("./csvcmp/tests/test-data/only-in/testset-1/")
+    obj.diff(
         ParallelInputArgs(
             left_input=["test1.csv"],
             right_input=["test2.csv"],
