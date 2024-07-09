@@ -5,7 +5,16 @@ from csvuniondiff.command import CommandLineParser
 
 
 class CommandLineParserTest(TestCase):
-    def test_parse_only_in(self):
+    def test_parse_version(self):
+        command_line_parser = CommandLineParser("--version".split())
+        version = command_line_parser.parse_version()
+        self.assertEqual(version, True)
+
+        command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
+        version = command_line_parser.parse_version()
+        self.assertEqual(version, False)
+
+    def test_parse_diff(self):
         command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
         only_in = command_line_parser.parse_diff()
         self.assertEqual(only_in, ["test1.csv", "test2.csv"])
@@ -22,7 +31,7 @@ class CommandLineParserTest(TestCase):
             command_line_parser = CommandLineParser("--diff".split())
             only_in = command_line_parser.parse_diff()
 
-    def test_parse_intersection(self):
+    def test_parse_union(self):
         command_line_parser = CommandLineParser("--union test1.csv test2.csv".split())
         intersection = command_line_parser.parse_union()
         self.assertEqual(intersection, ["test1.csv", "test2.csv"])
@@ -167,3 +176,21 @@ class CommandLineParserTest(TestCase):
         command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
         disable_printing = command_line_parser.parse_disable_printing()
         self.assertEqual(disable_printing, False)
+
+    def test_parse_print_prepared(self):
+        command_line_parser = CommandLineParser("--diff test1.csv test2.csv --print-prepared".split())
+        print_prepared = command_line_parser.parse_print_prepared()
+        self.assertEqual(print_prepared, True)
+
+        command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
+        print_prepared = command_line_parser.parse_print_prepared()
+        self.assertEqual(print_prepared, False)
+    
+    def test_parse_save_file_extension(self):
+        command_line_parser = CommandLineParser("--diff test1.csv test2.csv --save-file-extension .csv".split())
+        save_file_extension = command_line_parser.parse_save_file_extension()
+        self.assertEqual(save_file_extension, ".csv")
+
+        command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
+        save_file_extension = command_line_parser.parse_save_file_extension()
+        self.assertEqual(save_file_extension, None)

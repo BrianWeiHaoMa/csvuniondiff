@@ -1,14 +1,15 @@
-from setuptools import setup
+from csvuniondiff import __version__
+from setuptools import setup, find_packages
 
 setup(
     name='csvuniondiff',
-    version='0.1.0',    
-    description='a package for comparing csv or csv-like files',
-    url='https://github.com/BrianWeiHaoMa/csvcmp',
+    version=__version__,    
+    description='A package for comparing csv or csv-like files through union and difference operations.',
+    url='https://github.com/BrianWeiHaoMa/csvuniondiff',
     author='Brian Ma',
     author_email='brianmaytc@gmail.com',
     license='MIT',
-    packages=['csvuniondiff'],
+    packages=find_packages(exclude=('tests')),
     install_requires=[
         'numpy>=2.0.0',
         'pandas>=2.2.2',
@@ -18,15 +19,15 @@ setup(
         'tzdata>=2024.1',
     ],
     classifiers=[
-        'Development Status :: 1 - Planning',
-        'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: BSD License',  
-        'Operating System :: POSIX :: Linux',        
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'Intended Audience :: Financial and Insurance Industry',
+        'License :: OSI Approved :: MIT License', 
+        'Operating System :: OS Independent',  
+        'Topic :: Software Development :: Testing',      
+        'Topic :: Utilities',
+        'Topic :: Office/Business :: Financial :: Spreadsheet',
+        'Programming Language :: Python :: 3.12',
     ],
     entry_points={
         'console_scripts': [

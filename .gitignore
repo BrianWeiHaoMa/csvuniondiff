@@ -5,9 +5,11 @@ csvcmp-data
 tmp.txt
 .mypy_cache
 csvcmp.egg-info
-dists
+dist
 .vscode
 build
 test_venv
 csvuniondiff.egg-info
 .test_venv
+union
+README.rst

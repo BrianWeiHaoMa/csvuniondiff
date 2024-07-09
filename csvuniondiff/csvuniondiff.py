@@ -11,7 +11,7 @@ def change_inputs_to_dfs(
         first_input: list[str | pd.DataFrame], 
         drop_null: bool = False,
         fill_null: str | None = None,
-        input_dir: str = f".{os.sep}",
+        input_dir: str = os.getcwd(),
         **kwargs,
     ) -> list[pd.DataFrame] | tuple[list[pd.DataFrame], ...]:
     all_inputs = [first_input] + [input_ for input_ in kwargs.values()]
@@ -48,10 +48,15 @@ def _pretty_format_dict(
         func,
     ):
     def wrapper(*args, **kwargs):
+        dont_show_vals = [
+            None,
+            False,
+            [],
+        ]
         data = func(*args, **kwargs)
         res = ""
         for key, val in data.items():
-            if val is not None:
+            if val not in dont_show_vals or 1:
                 res += f"{key}: {val}\n"
         return res
     return wrapper
@@ -71,6 +76,8 @@ class CommandOptions:
             drop_duplicates: bool = False,
             keep_columns: list[str] | None = None,
             use_common_columns: bool = False,
+            print_prepared: bool = False,
+            print_transformed: bool = False,
         ):
         self.align_columns = align_columns
         self.use_columns = use_columns
@@ -83,6 +90,8 @@ class CommandOptions:
         self.drop_duplicates = drop_duplicates
         self.keep_columns = keep_columns
         self.use_common_columns = use_common_columns
+        self.print_prepared = print_prepared
+        self.print_transformed = print_transformed
 
         self.check()
 
@@ -286,16 +295,16 @@ class ParallelInput:
                 columns_to_use,
                 left_name,
                 right_name,
-                data_save_file_extension,
+                data_save_file_extension.lstrip("."),
             )
         raise StopIteration        
 
 
-class CSVUnionDiff:
+class CsvUnionDiff:
     def __init__(
             self, 
-            input_dir: str = "./",
-            output_dir: str | None = "./csvcmp-data/",
+            input_dir: str = os.getcwd(),
+            output_dir: str | None = os.path.join(os.getcwd(), "csvcmp-data"),
         ):
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -393,12 +402,6 @@ class CSVUnionDiff:
             else:
                 left_only_final = p_data.left_df_trans.iloc[left_only_final_ind].sort_index()
                 right_only_final = p_data.right_df_trans.iloc[right_only_final_ind].sort_index()
-
-            def _diff_format(
-                name: str, 
-                df: pd.DataFrame,
-            ) -> str:
-                return f"Only in {name} {df.shape}:\n{df}\n"
             
             if options.drop_duplicates:
                 left_only_final = left_only_final.drop_duplicates(keep="first")
@@ -409,6 +412,20 @@ class CSVUnionDiff:
                 right_columns = pd.Index(options.keep_columns).intersection(right_only_final.columns)
                 left_only_final = left_only_final[left_columns]
                 right_only_final = right_only_final[right_columns]
+
+            if options.print_prepared:
+                LOGGER.info(self._get_prepared_df_string(p_data.left_name, p_data.left_df))
+                LOGGER.info(self._get_prepared_df_string(p_data.right_name, p_data.right_df))
+
+            if options.print_transformed:
+                LOGGER.info(self._get_transformed_df_string(p_data.left_name, p_data.left_df_trans))
+                LOGGER.info(self._get_transformed_df_string(p_data.right_name, p_data.right_df_trans))
+
+            def _diff_format(
+                name: str, 
+                df: pd.DataFrame,
+            ) -> str:
+                return f"Only in {name} {df.shape}:\n{df}\n"
 
             LOGGER.info(_diff_format(p_data.left_name, left_only_final))
             LOGGER.info(_diff_format(p_data.right_name, right_only_final))
@@ -506,12 +523,6 @@ class CSVUnionDiff:
             else:
                 left_final = p_data.left_df_trans.iloc[left_final_ind].sort_index()
                 right_final = p_data.right_df_trans.iloc[right_final_ind].sort_index()
-
-            def _union_format(
-                name: str, 
-                df: pd.DataFrame,
-            ) -> str:
-                return f"Intersecting rows from {name} {df.shape}:\n{df}\n"
             
             if options.drop_duplicates:
                 left_final = left_final.drop_duplicates(keep="first")
@@ -522,6 +533,20 @@ class CSVUnionDiff:
                 right_columns = pd.Index(options.keep_columns).intersection(right_final.columns)
                 left_final = left_final[left_columns]
                 right_final = right_final[right_columns]
+
+            if options.print_prepared:
+                LOGGER.info(self._get_prepared_df_string(p_data.left_name, p_data.left_df))
+                LOGGER.info(self._get_prepared_df_string(p_data.right_name, p_data.right_df))
+
+            if options.print_transformed:
+                LOGGER.info(self._get_transformed_df_string(p_data.left_name, p_data.left_df_trans))
+                LOGGER.info(self._get_transformed_df_string(p_data.right_name, p_data.right_df_trans))
+
+            def _union_format(
+                name: str, 
+                df: pd.DataFrame,
+            ) -> str:
+                return f"Intersecting rows from {name} {df.shape}:\n{df}\n"
 
             LOGGER.info(_union_format(p_data.left_name, left_final))
             LOGGER.info(_union_format(p_data.right_name, right_final))
@@ -679,62 +704,19 @@ class CSVUnionDiff:
         shifted_lines = [' ' * indent + line for line in lines]
         middle = "\n".join(shifted_lines)
         
-        final_string = f"{func_name}(\n\n{middle}\n)\n"
+        final_string = f"{func_name}(\n{middle}".rstrip() + "\n)\n"
         return final_string
-
-
-if __name__ == "__main__":
-    obj = CSVUnionDiff("./csvcmp/tests/test-data/only-in/testset-1/")
-    obj.diff(
-        ParallelInputArgs(
-            left_input=["test1.csv"],
-            right_input=["test2.csv"],
-        ),
-        options=CommandOptions(
-            match_rows=False, 
-            enable_printing=True, 
-            add_save_timestamp=True,
-        ),
-    )
-
-    # obj = CSVCmp("./csvcmp/tests/test-data/different-file-types/")
-    # obj.only_in(
-    #     ParallelInputArgs(
-    #         left_input=["0_only_in_test1.csv", "0_only_in_test1.xlsx", "0_only_in_test1.json", "0_only_in_test1.xml", "0_only_in_test1.html"],
-    #         right_input=["0_only_in_test2.csv", "0_only_in_test2.xlsx", "0_only_in_test2.json", "0_only_in_test2.xml", "0_only_in_test2.html"],
-    #         data_save_file_extensions=["csv"] * 5
-    #     ),
-    #     options=CommandOptions(
-    #         match_rows=False, 
-    #         enable_printing=True, 
-    #         add_save_timestamp=True,
-    #     ),
-    # )
-
-    # obj = CSVCmp("./csvcmp/tests/test-data/intersection/testset-1/")
-    # obj.intersection(
-    #     ParallelInputArgs(
-    #         left_input=["test1.csv"],
-    #         right_input=["test2.csv"],
-    #     ),
-    #     options=CommandOptions(
-    #         match_rows=False, 
-    #         enable_printing=True, 
-    #         add_save_timestamp=True,
-    #         drop_duplicates=True,
-    #     ),
-    # )
     
-    # obj = CSVCmp("./csvcmp/tests/test-data/random/")
-    # obj.only_in(
-    #     ParallelInputArgs(
-    #         left_input=["test2.csv"],
-    #         right_input=["test3.csv"],
-    #     ),
-    #     options=CommandOptions(
-    #         match_rows=True, 
-    #         enable_printing=True, 
-    #         add_save_timestamp=True,
-    #         align_columns=True,
-    #     ),
-    # )
+    def _get_prepared_df_string(
+            self, 
+            name: str,
+            df: pd.DataFrame,
+        ) -> str:
+        return f"Prepared df for {name} {df.shape}:\n{df}\n"
+    
+    def _get_transformed_df_string(
+            self, 
+            name: str,
+            df: pd.DataFrame,
+        ) -> str:
+        return f"Transformed df for {name} {df.shape}:\n{df}\n"

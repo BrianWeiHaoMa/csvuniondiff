@@ -3,7 +3,7 @@ from unittest import TestCase
 import pandas as pd
 
 from csvuniondiff.csvuniondiff import (
-    CSVUnionDiff, 
+    CsvUnionDiff, 
     CommandOptions,
     ParallelInput,
     ParallelInputArgs,
@@ -87,7 +87,7 @@ class DiffTest(TestCase):
     test_set_folder = f"./csvuniondiff/tests/test-data/diff/"
 
     def test_match_rows_true(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-1/", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-1/", None)
         parallel_input_args = ParallelInputArgs(
             ["test1.csv"], 
             ["test2.csv"],
@@ -117,7 +117,7 @@ class DiffTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
         
     def test_match_rows_false(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-1/", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-1/", None)
         parallel_input_args = ParallelInputArgs(
             ["test1.csv"], 
             ["test2.csv"], 
@@ -147,7 +147,7 @@ class DiffTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
     
     def test_match_rows_true_transform(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-2/", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-2/", None)
 
         def left_df_trans(df: pd.DataFrame) -> pd.DataFrame:
             def email_trans(row):
@@ -189,7 +189,7 @@ class DiffTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
 
     def test_match_rows_true_align_columns(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-4/", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-4/", None)
         parallel_input_args = ParallelInputArgs(
             ["test1.csv"], 
             ["test2.csv"], 
@@ -225,7 +225,7 @@ class DiffTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
 
     def test_keep_columns(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-4/", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-4/", None)
         parallel_input_args = ParallelInputArgs(
             ["test1.csv"], 
             ["test2.csv"], 
@@ -245,8 +245,6 @@ class DiffTest(TestCase):
         left_df = left_dfs[0]
         right_df = right_dfs[0]
 
-        print(left_df)
-
         expected_left_df = pd.DataFrame({
             'Name': ['Michael Wilson', 'Michael Wilson', 'Bob Thompson', 'Emily Davis', 'Michael Wilson'],
             'Age': [32, 32, 35, 27, 32],
@@ -265,7 +263,7 @@ class UnionTest(TestCase):
     test_set_folder = f"./csvuniondiff/tests/test-data/union/"
 
     def test_match_rows_true(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-1", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
         parallel_input_args = ParallelInputArgs(
             ["test1.csv"], 
             ["test2.csv"], 
@@ -295,7 +293,7 @@ class UnionTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
 
     def test_match_rows_false(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-1", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
         parallel_input_args = ParallelInputArgs(
             ["test1.csv"], 
             ["test2.csv"], 
@@ -325,7 +323,7 @@ class UnionTest(TestCase):
         self.assertTrue(right_df.equals(expected_right_df))
     
     def test_keep_columns(self):
-        obj = CSVUnionDiff(f"{self.test_set_folder}testset-1", None)
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
         parallel_input_args = ParallelInputArgs(
             ["test1.csv"], 
             ["test2.csv"], 
