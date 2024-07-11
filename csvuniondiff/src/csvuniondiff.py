@@ -755,7 +755,7 @@ class CsvUnionDiff:
 
         middle = ""
         for key, val in all_locals.items():
-            string = f"{key}\n{"-" * len(key)}\n{str(val)}\n"
+            string = f"{key}\n{'-' * len(key)}\n{str(val)}\n"
             middle += string
 
         indent = 4

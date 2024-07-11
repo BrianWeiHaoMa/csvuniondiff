@@ -1,7 +1,7 @@
 import os
 from unittest import TestCase
 
-from csvuniondiff.command import CommandLineParser
+from csvuniondiff.src.command import CommandLineParser
 
 
 class CommandLineParserTest(TestCase):

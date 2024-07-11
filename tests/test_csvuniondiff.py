@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import pandas as pd
 
-from csvuniondiff.csvuniondiff import (
+from csvuniondiff.src.csvuniondiff import (
     CsvUnionDiff, 
     CommandOptions,
     ParallelInput,
@@ -13,7 +13,7 @@ from csvuniondiff.csvuniondiff import (
 
 class PublicFunctionsTest(TestCase):
     def test_change_inputs_to_dfs(self):
-        test_set_folder = "./csvuniondiff/tests/test-data/random/"
+        test_set_folder = "./tests/test-data/random/"
 
         tmp_df = pd.DataFrame({
             'A': [1, 2, 3, 4, 5],
@@ -84,7 +84,7 @@ class CommandOptionsTest(TestCase):
 
 
 class DiffTest(TestCase):
-    test_set_folder = f"./csvuniondiff/tests/test-data/diff/"
+    test_set_folder = f"./tests/test-data/diff/"
 
     def test_match_rows_true(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1/", None)
@@ -261,7 +261,7 @@ class DiffTest(TestCase):
 
 
 class UnionTest(TestCase):
-    test_set_folder = f"./csvuniondiff/tests/test-data/union/"
+    test_set_folder = f"./tests/test-data/union/"
 
     def test_match_rows_true(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
@@ -355,7 +355,7 @@ class UnionTest(TestCase):
 
 
 class ParallelInputTest(TestCase):
-    test_set_folder = f"./csvuniondiff/tests/test-data/random/"
+    test_set_folder = f"./tests/test-data/random/"
 
     def test_use_columns(self):
         obj = ParallelInput(

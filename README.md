@@ -26,6 +26,39 @@ where ```...``` can be replaced with whatever is available from the package.
 
 ## Examples
 ### Command-line
+Currently supported command line options are:
+```
+options:
+  -h, --help            show this help message and exit
+  --version             print the version of this package
+  --diff DIFF DIFF      use the diff command, takes 2 files as arguments
+  --union UNION UNION   use the union command, takes 2 files as arguments
+  -a, --align-columns   aligns common columns on the left sorted
+  -c [USE_COLUMNS ...], --use-columns [USE_COLUMNS ...]
+                        only use these columns for comparison
+  --ignore-columns [IGNORE_COLUMNS ...]
+                        do not use these columns for comparison
+  -f [FILL_NULL], --fill-null [FILL_NULL]
+                        fills null option value so that they can be compared, default is 'NULL'
+  -d, --drop-null       drop rows with nulls
+  -D, --drop-duplicates
+                        drop duplicate rows
+  -i INPUT_DIR, --input-dir INPUT_DIR
+                        use this directory path as the base for the path to the files
+  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
+                        save outputs from the script to this directory
+  -m, --match-rows      use the match rows algorithm for comparison
+  -k [KEEP_COLUMNS ...], --keep-columns [KEEP_COLUMNS ...]
+                        only keep these columns in the final result
+  -C, --use-common-columns
+                        use the maximal set of common columns for comparison
+  --dont-add-timestamp  don't add a timestamp directory when outputting files
+  --disable-printing    disable printing to stdout
+  --print-prepared      print the prepared df before comparison
+  --save-file-extension SAVE_FILE_EXTENSION
+                        the extension for output files (csv, xlsx, json, xml, or html)
+```
+
 1. 
     **test2.csv**:
     |       | column7 | column1 | column2 | column3  | column4  | column5  | column6  |
@@ -83,7 +116,6 @@ where ```...``` can be replaced with whatever is available from the package.
     column1 column2 column3 column4
     0  value1  value2  value3  value4
     ```
-
 2.
     Look [here](#match-rows-explanation) for input files. \
     **Input**
@@ -125,7 +157,7 @@ where ```...``` can be replaced with whatever is available from the package.
     7  Michael Johnson__1   32  michaeljohnson@example.com
     8      Emily Davis__1   27      emilydavis@example.com
     ```
-    
+
 ### Programming
 1.
     **test1.csv**
@@ -142,6 +174,7 @@ where ```...``` can be replaced with whatever is available from the package.
     | 8     | Christopher Lee  | 33  | christopherlee@example.com|
     | 9     | Laura Taylor     | 29  | laurataylor@example.com  |
     **test2.csv**
+
     | Index | Name             | Email                     | Age |
     |-------|------------------|---------------------------|-----|
     | 0     | John Doe         | johndoe25@example.com     | 25  |
@@ -152,6 +185,7 @@ where ```...``` can be replaced with whatever is available from the package.
     | 5     | Christopher Lee  | christopherlee33@example.com | 33 |
     | 6     | Laura Taylor     | laurataylor29@example.com | 29  |
     | 7     | Brian Harris     | brianharris33@example.com | 33  |
+
     **Input**
     ```
     import pandas as pd
@@ -323,10 +357,10 @@ To explain the match rows option, let's consider the following CSV tables:
 </table>
 
 When matching rows in the diff operation
-1.  The first John Doe in both files is matched, so the second John Doe in csv2 is only in csv2.
-2.  The first Jane Smith in both files is matched, so the second Jane Smith in csv2 is only in csv2.
-3.  Both files have exactly 1 Alice Johnson and Sarah Brown so they are both matched and neither are only in csv1 or csv2.
-4.  The remaining rows are all unique between the two files so they are only in csv1 or csv2, respectively.
+1.  The first John Doe in both files is matched, so the second John Doe in **csv2** is only in **csv2**.
+2.  The first Jane Smith in both files is matched, so the second Jane Smith in **csv2** is only in **csv2**.
+3.  Both files have exactly 1 Alice Johnson and Sarah Brown so they are both matched and neither are only in **csv1** or **csv2**.
+4.  The remaining rows are all unique between the two files so they are only in **csv1** or **csv2**, respectively.
 
 Therefore, with the match rows option, the results of the diff operation will be:
 
@@ -353,7 +387,7 @@ Therefore, with the match rows option, the results of the diff operation will be
 </td></tr>
 </table>
 
-Using the union operation instead with csv1 and csv2, we get:
+Using the union operation with match rows instead with **csv1** and **csv2**, we get:
 
 <table>
 <tr><th>intersecting from csv1</th><th>intersecting from csv2</th></tr>
@@ -375,3 +409,4 @@ Using the union operation instead with csv1 and csv2, we get:
 | 5     | Sarah Brown    | 29  | sarahbrown@example.com    |
 </td></tr>
 </table>
+

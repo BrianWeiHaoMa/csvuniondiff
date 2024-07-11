@@ -2,7 +2,7 @@ import os
 import sys
 from argparse import ArgumentParser
 
-from csvuniondiff.csvuniondiff import CsvUnionDiff, ParallelInputArgs, CommandOptions
+from .csvuniondiff import CsvUnionDiff, ParallelInputArgs, CommandOptions
 from csvuniondiff import __version__
 
 
@@ -20,23 +20,23 @@ class CommandLineParser:
         self.args = argument_parser.parse_args(args=args)
     
     def get_argument_parser(self) -> ArgumentParser:
-        argument_parser = ArgumentParser(description="csvcmp command line parser")
+        argument_parser = ArgumentParser(description="csvuniondiff command line parser")
 
         argument_parser.add_argument("--version", action="store_true", help="print the version of this package")
         argument_parser.add_argument("--diff", nargs=2, help="use the diff command, takes 2 files as arguments")
         argument_parser.add_argument("--union", nargs=2, help="use the union command, takes 2 files as arguments")
 
-        argument_parser.add_argument("--align-columns", action="store_true", help="aligns common columns on the left sorted")
-        argument_parser.add_argument("--use-columns", default=None, nargs="*", help="only use these columns for comparison")
+        argument_parser.add_argument("-a", "--align-columns", action="store_true", help="aligns common columns on the left sorted")
+        argument_parser.add_argument("-c", "--use-columns", default=None, nargs="*", help="only use these columns for comparison")
         argument_parser.add_argument("--ignore-columns", default=None, nargs="*", help="do not use these columns for comparison")
-        argument_parser.add_argument("--fill-null", nargs="?", const="NULL", type=str, help="fills null option value so that they can be compared, default is 'NULL'")
-        argument_parser.add_argument("--drop-null", action="store_true", help="drop rows with nulls")
-        argument_parser.add_argument("--drop-duplicates", action="store_true", help="drop duplicate rows")
-        argument_parser.add_argument("--input-dir", default=f"{os.sep}", type=str, help="use this directory path as the base for the path to the files")
-        argument_parser.add_argument("--output-dir", type=str, help="save outputs from the script to this directory")
-        argument_parser.add_argument("--match-rows", action="store_true", help="use the match rows algorithm for comparison")
-        argument_parser.add_argument("--keep-columns", default=None, nargs="*", help="only keep these columns in the final result")
-        argument_parser.add_argument("--use-common-columns", action="store_true", help="use the maximal set of common columns for comparison")
+        argument_parser.add_argument("-f", "--fill-null", nargs="?", const="NULL", type=str, help="fills null option value so that they can be compared, default is 'NULL'")
+        argument_parser.add_argument("-d", "--drop-null", action="store_true", help="drop rows with nulls")
+        argument_parser.add_argument("-D", "--drop-duplicates", action="store_true", help="drop duplicate rows")
+        argument_parser.add_argument("-i", "--input-dir", default=f"{os.sep}", type=str, help="use this directory path as the base for the path to the files")
+        argument_parser.add_argument("-o", "--output-dir", type=str, help="save outputs from the script to this directory")
+        argument_parser.add_argument("-m", "--match-rows", action="store_true", help="use the match rows algorithm for comparison")
+        argument_parser.add_argument("-k", "--keep-columns", default=None, nargs="*", help="only keep these columns in the final result")
+        argument_parser.add_argument("-C", "--use-common-columns", action="store_true", help="use the maximal set of common columns for comparison")
         argument_parser.add_argument("--dont-add-timestamp", action="store_true", help="don't add a timestamp directory when outputting files")
         argument_parser.add_argument("--disable-printing", action="store_true", help="disable printing to stdout")
         argument_parser.add_argument("--print-prepared", action="store_true", help="print the prepared df before comparison")
