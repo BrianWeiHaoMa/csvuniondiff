@@ -163,6 +163,7 @@ class DiffTest(TestCase):
             ["test2.csv"], 
             left_trans_funcs=[left_df_trans],
             right_trans_funcs=[lambda x: x],
+            return_transformed_rows=False,
         )
         options = CommandOptions(match_rows=True, enable_printing=False)
         left_dfs, right_dfs = obj.diff(
@@ -175,8 +176,8 @@ class DiffTest(TestCase):
 
         expected_left_df = pd.DataFrame({
             'Name': ['Michael Brown', 'Sarah Wilson', 'David Thompson'],
-            'Email': ['michaelbrown28@example.com', 'sarahwilson32@example.com', 'davidthompson45@example.com'],
             'Age': [28, 32, 45],
+            'Email': ['michaelbrown@example.com', 'sarahwilson@example.com', 'davidthompson@example.com'],
         }, index=[4, 5, 6])
 
         expected_right_df = pd.DataFrame({

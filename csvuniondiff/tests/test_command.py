@@ -193,4 +193,4 @@ class CommandLineParserTest(TestCase):
 
         command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
         save_file_extension = command_line_parser.parse_save_file_extension()
-        self.assertEqual(save_file_extension, None)
+        self.assertEqual(save_file_extension, "csv")

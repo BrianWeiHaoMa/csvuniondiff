@@ -22,25 +22,25 @@ class CommandLineParser:
     def get_argument_parser(self) -> ArgumentParser:
         argument_parser = ArgumentParser(description="csvcmp command line parser")
 
-        argument_parser.add_argument("--version", action="store_true", help="the version of this package")
+        argument_parser.add_argument("--version", action="store_true", help="print the version of this package")
         argument_parser.add_argument("--diff", nargs=2, help="use the diff command, takes 2 files as arguments")
         argument_parser.add_argument("--union", nargs=2, help="use the union command, takes 2 files as arguments")
 
-        argument_parser.add_argument("--align-columns", action="store_true", help="if column names are not aligned in csv, but both have same column names, realigns the column names to match")
+        argument_parser.add_argument("--align-columns", action="store_true", help="aligns common columns on the left sorted")
         argument_parser.add_argument("--use-columns", default=None, nargs="*", help="only use these columns for comparison")
         argument_parser.add_argument("--ignore-columns", default=None, nargs="*", help="do not use these columns for comparison")
-        argument_parser.add_argument("--fill-null", nargs="?", const="NULL", type=str, help="fills null with 'NULL' so that they can be compared")
+        argument_parser.add_argument("--fill-null", nargs="?", const="NULL", type=str, help="fills null option value so that they can be compared, default is 'NULL'")
         argument_parser.add_argument("--drop-null", action="store_true", help="drop rows with nulls")
-        argument_parser.add_argument("--drop-duplicates", action="store_true", help="drop duplicates")
-        argument_parser.add_argument("--input-dir", default=f"{os.sep}", type=str, help="use this dir as the base for the path to the files")
-        argument_parser.add_argument("--output-dir", type=str, help="use this dir as the base for the outputs of the script")
-        argument_parser.add_argument("--match-rows", action="store_true", help="use the match rows method with the command")
-        argument_parser.add_argument("--keep-columns", default=None, nargs="*", help="keep only these columns in the output")
-        argument_parser.add_argument("--use-common-columns", action="store_true", help="use the largest set of common columns for comparison and ignores those that are not common")
-        argument_parser.add_argument("--dont-add-timestamp", action="store_true", help="don't add a timestamp when outputting files")
+        argument_parser.add_argument("--drop-duplicates", action="store_true", help="drop duplicate rows")
+        argument_parser.add_argument("--input-dir", default=f"{os.sep}", type=str, help="use this directory path as the base for the path to the files")
+        argument_parser.add_argument("--output-dir", type=str, help="save outputs from the script to this directory")
+        argument_parser.add_argument("--match-rows", action="store_true", help="use the match rows algorithm for comparison")
+        argument_parser.add_argument("--keep-columns", default=None, nargs="*", help="only keep these columns in the final result")
+        argument_parser.add_argument("--use-common-columns", action="store_true", help="use the maximal set of common columns for comparison")
+        argument_parser.add_argument("--dont-add-timestamp", action="store_true", help="don't add a timestamp directory when outputting files")
         argument_parser.add_argument("--disable-printing", action="store_true", help="disable printing to stdout")
-        argument_parser.add_argument("--print-prepared", action="store_true", help="print the prepared df")
-        argument_parser.add_argument("--save-file-extension", type=str, help="the extension for output files")
+        argument_parser.add_argument("--print-prepared", action="store_true", help="print the prepared df before comparison")
+        argument_parser.add_argument("--save-file-extension", default="csv", type=str, help="the extension for output files (csv, xlsx, json, xml, or html)")
 
         return argument_parser
     
@@ -197,7 +197,7 @@ def main():
                 left_trans_funcs=[],
                 right_trans_funcs=[],
                 data_save_file_extensions=[save_file_extension],
-                output_transformed_rows=False,
+                return_transformed_rows=False,
             ),
             options=options,
         )
@@ -210,7 +210,7 @@ def main():
                 left_trans_funcs=[],
                 right_trans_funcs=[],
                 data_save_file_extensions=[save_file_extension],
-                output_transformed_rows=False,
+                return_transformed_rows=False,
             ),
             options=options,
         )

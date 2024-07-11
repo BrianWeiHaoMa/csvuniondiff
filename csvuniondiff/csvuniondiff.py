@@ -14,6 +14,23 @@ def change_inputs_to_dfs(
         input_dir: str = os.getcwd(),
         **kwargs,
     ) -> list[pd.DataFrame] | tuple[list[pd.DataFrame], ...]:
+    """A useful function for converting a list of strings to dataframes. 
+    The strings should be file paths to files with extensions csv, xlsx, json, xml, or html.
+    Dataframes originally in the input list will be left as is. Add extra lists as kwargs
+    to convert more than one list.
+
+    Args:
+        first_input (list[str  |  pd.DataFrame]): A list of strings or dataframes.
+        drop_null (bool, optional): Drop rows with null values. Defaults to False.
+        fill_null (str | None, optional): Fill rows with a string. Defaults to None which doesn't fill.
+        input_dir (str, optional): A directory path that will be appended to all file paths in the list. Defaults to os.getcwd().
+
+    Raises:
+        ValueError: Unsupported file extension.
+
+    Returns:
+        list[pd.DataFrame] | tuple[list[pd.DataFrame], ...]: The resulting list(s) of dataframes.
+    """
     all_inputs = [first_input] + [input_ for input_ in kwargs.values()]
 
     for input_ in all_inputs:
@@ -56,7 +73,7 @@ def _pretty_format_dict(
         data = func(*args, **kwargs)
         res = ""
         for key, val in data.items():
-            if val not in dont_show_vals or 1:
+            if val not in dont_show_vals:
                 res += f"{key}: {val}\n"
         return res
     return wrapper
@@ -79,6 +96,26 @@ class CommandOptions:
             print_prepared: bool = False,
             print_transformed: bool = False,
         ):
+        """Options that are globally applicable CsvUnionDiff commands.
+
+        drop_null (bool, optional): Drop rows with null values. Defaults to False.
+        fill_null (str | None, optional): Fill rows with a string. Defaults to None which doesn't fill.
+
+        Args:
+            align_columns (bool, optional): Align the maximal set of common columns sorted on the left. Defaults to False.
+            use_columns (list[str] | None, optional): The columns to use for comparison. Defaults to None.
+            ignore_columns (list[str] | None, optional): The columns to ignore for comparison. Defaults to None.
+            fill_null (str | None, optional): Fill rows with a string. Defaults to None.
+            drop_null (bool, optional): Drop rows with null values. Defaults to False.
+            match_rows (bool, optional): Use the match rows algorithm. Defaults to True.
+            enable_printing (bool, optional): Print to stdout. Defaults to True.
+            add_save_timestamp (bool, optional): Add a timestamp subfolder for output files. Defaults to False.
+            drop_duplicates (bool, optional): Drop duplicate rows. Defaults to False.
+            keep_columns (list[str] | None, optional): Only keep these columns in the final result. Defaults to None.
+            use_common_columns (bool, optional): Use the maximal set of common columns for comparison. Defaults to False.
+            print_prepared (bool, optional): Print the prepared dataframes (before comparison). Defaults to False.
+            print_transformed (bool, optional): Print the transformed dataframes (before comparison). Defaults to False.
+        """
         self.align_columns = align_columns
         self.use_columns = use_columns
         self.ignore_columns = ignore_columns
@@ -118,14 +155,26 @@ class ParallelInputArgs:
         left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] = [],
         right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] = [],
         data_save_file_extensions: list[str] = [],
-        output_transformed_rows: bool = False,
+        return_transformed_rows: bool = False,
     ):
+        """Parallel input arguments for CsvUnionDiff commands where
+        the left and right input lists are compared in parallel. And a result list
+        of the same size as left_input and right_input is returned.
+
+        Args:
+            left_input (list[str  |  pd.DataFrame]): A list of strings or dataframes to be compared with. The strings should be file paths to files with extensions csv, xlsx, json, xml, or html.
+            right_input (list[str  |  pd.DataFrame]): Same as left_input.
+            left_trans_funcs (list[Callable[[pd.DataFrame], pd.DataFrame]], optional): Transformation functions for elements in left_input. Defaults to [].
+            right_trans_funcs (list[Callable[[pd.DataFrame], pd.DataFrame]], optional): Transformation functions for elements in right_input. Defaults to [].
+            data_save_file_extensions (list[str], optional): The extension to save. Defaults to [] which will just be csv.
+            return_transformed_rows (bool, optional): Return the rows after transformation. Defaults to False.
+        """
         self.left_input = left_input
         self.right_input = right_input
         self.left_trans_funcs = left_trans_funcs
         self.right_trans_funcs = right_trans_funcs
         self.data_save_file_extensions = data_save_file_extensions
-        self.output_transformed_rows = output_transformed_rows
+        self.return_transformed_rows = return_transformed_rows
 
     @_pretty_format_dict
     def __str__(self):
@@ -208,8 +257,8 @@ class ParallelInput:
         if type(dfs_res) is tuple:
             self.left_dfs, self.right_dfs = dfs_res
 
-        self.left_dfs_trans = [left_trans_funcs[i](self.left_dfs[i]) for i in range(self.length)]
-        self.right_dfs_trans = [right_trans_funcs[i](self.right_dfs[i]) for i in range(self.length)]
+        self.left_dfs_trans = [left_trans_funcs[i](self.left_dfs[i].copy()) for i in range(self.length)]
+        self.right_dfs_trans = [right_trans_funcs[i](self.right_dfs[i].copy()) for i in range(self.length)]
 
         self.data_save_file_extensions = data_save_file_extensions
         
@@ -295,7 +344,7 @@ class ParallelInput:
                 columns_to_use,
                 left_name,
                 right_name,
-                data_save_file_extension.lstrip("."),
+                data_save_file_extension.lstrip(".") if data_save_file_extension is not None else None,
             )
         raise StopIteration        
 
@@ -306,6 +355,12 @@ class CsvUnionDiff:
             input_dir: str = os.getcwd(),
             output_dir: str | None = os.path.join(os.getcwd(), "csvcmp-data"),
         ):
+        """A class for comparing CSV-like files.
+
+        Args:
+            input_dir (str, optional): The directory path of the inputs which will be prepended to any input files. Defaults to os.getcwd().
+            output_dir (str | None, optional): The directory path of the outputs or None if no output files are needed. Defaults to os.path.join(os.getcwd(), "csvcmp-data").
+        """
         self.input_dir = input_dir
         self.output_dir = output_dir
 
@@ -314,6 +369,8 @@ class CsvUnionDiff:
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
+        """Compare two sets of dataframes in parallel and return the rows that are only in the left and right dataframes.
+        """
         LOGGER, data_save_dir_path = self._setup(
             options=options,
             command=self.diff,
@@ -396,13 +453,13 @@ class CsvUnionDiff:
             else:
                 left_only_final_ind, right_only_final_ind = _get_left_and_right_only_ind(p_data.left_df_trans, p_data.right_df_trans, p_data.columns_to_use)
 
-            if args.output_transformed_rows:
-                left_only_final = p_data.left_df.iloc[left_only_final_ind].sort_index()
-                right_only_final = p_data.right_df.iloc[right_only_final_ind].sort_index()
-            else:
+            if args.return_transformed_rows:
                 left_only_final = p_data.left_df_trans.iloc[left_only_final_ind].sort_index()
                 right_only_final = p_data.right_df_trans.iloc[right_only_final_ind].sort_index()
-            
+            else:
+                left_only_final = p_data.left_df.iloc[left_only_final_ind].sort_index()
+                right_only_final = p_data.right_df.iloc[right_only_final_ind].sort_index()
+
             if options.drop_duplicates:
                 left_only_final = left_only_final.drop_duplicates(keep="first")
                 right_only_final = right_only_final.drop_duplicates(keep="first")
@@ -454,6 +511,8 @@ class CsvUnionDiff:
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
+        """Compare two sets of dataframes in parallel and return the rows that are in both the left and right dataframes.
+        """
         LOGGER, data_save_dir_path = self._setup(
             options=options,
             command=self.union,
@@ -517,12 +576,12 @@ class CsvUnionDiff:
                 left_final_ind = pd.Index(merged_df["_left_index"].drop_duplicates())
                 right_final_ind = pd.Index(merged_df["_right_index"].drop_duplicates())
                 
-            if args.output_transformed_rows:
-                left_final = p_data.left_df.iloc[left_final_ind].sort_index()
-                right_final = p_data.right_df.iloc[right_final_ind].sort_index()
-            else:
+            if args.return_transformed_rows:
                 left_final = p_data.left_df_trans.iloc[left_final_ind].sort_index()
                 right_final = p_data.right_df_trans.iloc[right_final_ind].sort_index()
+            else:
+                left_final = p_data.left_df.iloc[left_final_ind].sort_index()
+                right_final = p_data.right_df.iloc[right_final_ind].sort_index()
             
             if options.drop_duplicates:
                 left_final = left_final.drop_duplicates(keep="first")
