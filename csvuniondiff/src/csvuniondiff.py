@@ -80,6 +80,8 @@ def _pretty_format_dict(
 
 
 class CommandOptions:
+    """A class for options that are globally applicable to CsvUnionDiff commands.
+    """
     def __init__(
             self,
             align_columns: bool = False,
@@ -130,9 +132,9 @@ class CommandOptions:
         self.print_prepared = print_prepared
         self.print_transformed = print_transformed
 
-        self.check()
+        self._check()
 
-    def check(self):
+    def _check(self):
         if self.use_columns is not None and self.ignore_columns is not None:
             raise ValueError("Only one of use_columns and ignore_columns should be used")
         
@@ -148,6 +150,8 @@ class CommandOptions:
 
 
 class ParallelInputArgs:
+    """A class for parallel input arguments for CsvUnionDiff commands.
+    """
     def __init__(
         self, 
         left_input: list[str | pd.DataFrame],
@@ -350,6 +354,8 @@ class ParallelInput:
 
 
 class CsvUnionDiff:
+    """A class for comparing CSV-like files.
+    """
     def __init__(
             self, 
             input_dir: str = os.getcwd(),
