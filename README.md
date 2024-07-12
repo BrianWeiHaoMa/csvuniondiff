@@ -15,10 +15,10 @@ CSVUnionDiff is an open-source library for comparing CSV-like files through unio
 ## Features
 - A convenient command-line tool for quickly comparing files.
 - A robust python package for comparing files in a programmatic way.
-- Incorporates pandas to allow for various input and output types.
 - A union operation to get the common rows between files.
 - A diff operation to get unique rows between files.
 - A match rows option which forces comparisons to be carried in a [specific useful way](#match-rows-explanation).
+- Incorporates pandas to allow for various input and output types (csv, xlsx, json, xml, or html) and integration with dataframes.
 
 ## Installation and usage
 To install through command-line, use 
@@ -175,7 +175,7 @@ options:
 ### Programming
 1. 
     **test1.csv**
-    | Index | Name             | Age | Email                    |
+    |       | Name             | Age | Email                    |
     |-------|------------------|-----|--------------------------|
     | 0     | John Doe         | 25  | johndoe@example.com      |
     | 1     | Jane Smith       | 30  | janesmith@example.com    |
@@ -189,7 +189,7 @@ options:
     | 9     | Laura Taylor     | 29  | laurataylor@example.com  |
     
     **test2.csv**
-    | Index | Name             | Email                     | Age |
+    |       | Name             | Email                     | Age |
     |-------|------------------|---------------------------|-----|
     | 0     | John Doe         | johndoe25@example.com     | 25  |
     | 1     | Jane Smith       | janesmith30@example.com   | 30  |
@@ -298,7 +298,7 @@ options:
         )
     )
 
-    only_in_test1, only_in_test2 = left_dfs[0], right_dfs[0] # Use the dataframe results somewhere
+    only_in_test1, only_in_test2 = left_dfs[0], right_dfs[0] # use dataframe results somewhere
     ```
 
     **Output**
@@ -442,7 +442,7 @@ Using the union operation with match rows instead with **csv1** and **csv2**, we
 | 8     | Sarah Brown    | 29  | sarahbrown@example.com    |
 </td><td>
 
-| Index | Name           | Age | Email                     |
+|       | Name           | Age | Email                     |
 |-------|----------------|-----|---------------------------|
 | 0     | John Doe       | 25  | johndoe@example.com       |
 | 2     | Jane Smith     | 30  | janesmith@example.com     |
@@ -451,3 +451,9 @@ Using the union operation with match rows instead with **csv1** and **csv2**, we
 </td></tr>
 </table>
 
+An example of where this might be useful is when you are cross-checking using the diff operation
+and you want to know the magnitude of the rows that you've missed and the extra rows that you have
+in your CSV when compared against an expected CSV. In this case, you can use
+```csvuniondiff --diff my.csv expected.csv --match-rows``` to get the rows with duplicates or
+ ```csvuniondiff --diff my.csv expected.csv --match-rows --row-counts``` to 
+get the count of each unique row in the result.
