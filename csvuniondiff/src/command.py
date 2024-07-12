@@ -32,8 +32,8 @@ class CommandLineParser:
         argument_parser.add_argument("-f", "--fill-null", nargs="?", const="NULL", type=str, help="fills null option value so that they can be compared, default is 'NULL'")
         argument_parser.add_argument("-d", "--drop-null", action="store_true", help="drop rows with nulls")
         argument_parser.add_argument("-D", "--drop-duplicates", action="store_true", help="drop duplicate rows")
-        argument_parser.add_argument("-i", "--input-dir", default=f"{os.sep}", type=str, help="use this directory path as the base for the path to the files")
-        argument_parser.add_argument("-o", "--output-dir", type=str, help="save outputs from the script to this directory")
+        argument_parser.add_argument("-i", "--input-dir", default=None, type=str, help="use this directory path as the base for the path to the files")
+        argument_parser.add_argument("-o", "--output-dir", default=None, type=str, help="save outputs from the script to this directory")
         argument_parser.add_argument("-m", "--match-rows", action="store_true", help="use the match rows algorithm for comparison")
         argument_parser.add_argument("-k", "--keep-columns", default=None, nargs="*", help="only keep these columns in the final result")
         argument_parser.add_argument("-C", "--use-common-columns", action="store_true", help="use the maximal set of common columns for comparison")
@@ -41,6 +41,7 @@ class CommandLineParser:
         argument_parser.add_argument("--disable-printing", action="store_true", help="disable printing to stdout")
         argument_parser.add_argument("--print-prepared", action="store_true", help="print the prepared df before comparison")
         argument_parser.add_argument("--save-file-extension", default="csv", type=str, help="the extension for output files (csv, xlsx, json, xml, or html)")
+        argument_parser.add_argument("-r", "--row-counts", action="store_true", help="use the counts of each unique row in the final result instead")
 
         return argument_parser
     
@@ -127,6 +128,9 @@ class CommandLineParser:
     
     def parse_save_file_extension(self) -> str | None:
         return self.args.save_file_extension
+    
+    def parse_row_counts(self) -> bool:
+        return self.args.row_counts
 
 
 def main():
@@ -156,6 +160,7 @@ def main():
     disable_printing = command_line_parser.parse_disable_printing()
     print_prepared = command_line_parser.parse_print_prepared()
     save_file_extension = command_line_parser.parse_save_file_extension()
+    row_counts = command_line_parser.parse_row_counts()
 
     commands_count = 0
     if diff is not None:
@@ -187,6 +192,8 @@ def main():
         use_common_columns=use_common_columns,
         print_prepared=print_prepared,
         print_transformed=False,
+        return_transformed_rows=False,
+        return_row_counts=row_counts,
     )
 
     if diff is not None:
@@ -197,7 +204,6 @@ def main():
                 left_trans_funcs=[],
                 right_trans_funcs=[],
                 data_save_file_extensions=[save_file_extension],
-                return_transformed_rows=False,
             ),
             options=options,
         )
@@ -210,7 +216,6 @@ def main():
                 left_trans_funcs=[],
                 right_trans_funcs=[],
                 data_save_file_extensions=[save_file_extension],
-                return_transformed_rows=False,
             ),
             options=options,
         )

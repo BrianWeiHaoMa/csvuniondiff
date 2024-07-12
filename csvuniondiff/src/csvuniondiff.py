@@ -97,6 +97,8 @@ class CommandOptions:
             use_common_columns: bool = False,
             print_prepared: bool = False,
             print_transformed: bool = False,
+            return_transformed_rows: bool = False,
+            return_row_counts: bool = False,
         ):
         """Options that are globally applicable CsvUnionDiff commands.
 
@@ -117,6 +119,8 @@ class CommandOptions:
             use_common_columns (bool, optional): Use the maximal set of common columns for comparison. Defaults to False.
             print_prepared (bool, optional): Print the prepared dataframes (before comparison). Defaults to False.
             print_transformed (bool, optional): Print the transformed dataframes (before comparison). Defaults to False.
+            return_transformed_rows (bool, optional): Return the rows after transformation. Defaults to False.
+            return_row_counts (bool, optional): Return the count of each unique row instead of each individual row. Defaults to False.
         """
         self.align_columns = align_columns
         self.use_columns = use_columns
@@ -131,6 +135,8 @@ class CommandOptions:
         self.use_common_columns = use_common_columns
         self.print_prepared = print_prepared
         self.print_transformed = print_transformed
+        self.return_transformed_rows = return_transformed_rows
+        self.return_counts = return_row_counts
 
         self._check()
 
@@ -159,7 +165,6 @@ class ParallelInputArgs:
         left_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] = [],
         right_trans_funcs: list[Callable[[pd.DataFrame], pd.DataFrame]] = [],
         data_save_file_extensions: list[str] = [],
-        return_transformed_rows: bool = False,
     ):
         """Parallel input arguments for CsvUnionDiff commands where
         the left and right input lists are compared in parallel. And a result list
@@ -171,14 +176,12 @@ class ParallelInputArgs:
             left_trans_funcs (list[Callable[[pd.DataFrame], pd.DataFrame]], optional): Transformation functions for elements in left_input. Defaults to [].
             right_trans_funcs (list[Callable[[pd.DataFrame], pd.DataFrame]], optional): Transformation functions for elements in right_input. Defaults to [].
             data_save_file_extensions (list[str], optional): The extension to save. Defaults to [] which will just be csv.
-            return_transformed_rows (bool, optional): Return the rows after transformation. Defaults to False.
         """
         self.left_input = left_input
         self.right_input = right_input
         self.left_trans_funcs = left_trans_funcs
         self.right_trans_funcs = right_trans_funcs
         self.data_save_file_extensions = data_save_file_extensions
-        self.return_transformed_rows = return_transformed_rows
 
     @_pretty_format_dict
     def __str__(self):
@@ -358,16 +361,16 @@ class CsvUnionDiff:
     """
     def __init__(
             self, 
-            input_dir: str = os.getcwd(),
+            input_dir: str | None = os.getcwd(),
             output_dir: str | None = os.path.join(os.getcwd(), "csvcmp-data"),
         ):
         """A class for comparing CSV-like files.
 
         Args:
-            input_dir (str, optional): The directory path of the inputs which will be prepended to any input files. Defaults to os.getcwd().
+            input_dir (str | None, optional): The directory path of the inputs which will be prepended to any input files. Defaults to os.getcwd().
             output_dir (str | None, optional): The directory path of the outputs or None if no output files are needed. Defaults to os.path.join(os.getcwd(), "csvcmp-data").
         """
-        self.input_dir = input_dir
+        self.input_dir = input_dir if input_dir is not None else os.getcwd()
         self.output_dir = output_dir
 
     def diff(
@@ -459,7 +462,7 @@ class CsvUnionDiff:
             else:
                 left_only_final_ind, right_only_final_ind = _get_left_and_right_only_ind(p_data.left_df_trans, p_data.right_df_trans, p_data.columns_to_use)
 
-            if args.return_transformed_rows:
+            if options.return_transformed_rows:
                 left_only_final = p_data.left_df_trans.iloc[left_only_final_ind].sort_index()
                 right_only_final = p_data.right_df_trans.iloc[right_only_final_ind].sort_index()
             else:
@@ -475,6 +478,10 @@ class CsvUnionDiff:
                 right_columns = pd.Index(options.keep_columns).intersection(right_only_final.columns)
                 left_only_final = left_only_final[left_columns]
                 right_only_final = right_only_final[right_columns]
+
+            if options.return_counts:
+                left_only_final = left_only_final.value_counts().reset_index()
+                right_only_final = right_only_final.value_counts().reset_index()
 
             if options.print_prepared:
                 LOGGER.info(self._get_prepared_df_string(p_data.left_name, p_data.left_df))
@@ -582,7 +589,7 @@ class CsvUnionDiff:
                 left_final_ind = pd.Index(merged_df["_left_index"].drop_duplicates())
                 right_final_ind = pd.Index(merged_df["_right_index"].drop_duplicates())
                 
-            if args.return_transformed_rows:
+            if options.return_transformed_rows:
                 left_final = p_data.left_df_trans.iloc[left_final_ind].sort_index()
                 right_final = p_data.right_df_trans.iloc[right_final_ind].sort_index()
             else:
@@ -598,6 +605,10 @@ class CsvUnionDiff:
                 right_columns = pd.Index(options.keep_columns).intersection(right_final.columns)
                 left_final = left_final[left_columns]
                 right_final = right_final[right_columns]
+            
+            if options.return_counts:
+                left_final = left_final.value_counts().reset_index()
+                right_final = right_final.value_counts().reset_index()
 
             if options.print_prepared:
                 LOGGER.info(self._get_prepared_df_string(p_data.left_name, p_data.left_df))

@@ -1,6 +1,17 @@
 # CSVUnionDiff
 CSVUnionDiff is an open-source library for comparing CSV-like files through union and difference operations. 
 
+- [CSVUnionDiff](#csvuniondiff)
+  - [Features](#features)
+  - [Installation and usage](#installation-and-usage)
+  - [Examples](#examples)
+    - [Command-line](#command-line)
+    - [Programming](#programming)
+  - [Possible use cases](#possible-use-cases)
+    - [Command-line](#command-line-1)
+    - [Programming](#programming-1)
+  - [Match rows algorithm explanation](#match-rows-algorithm-explanation)
+
 ## Features
 - A convenient command-line tool for quickly comparing files.
 - A robust python package for comparing files in a programmatic way.
@@ -9,7 +20,7 @@ CSVUnionDiff is an open-source library for comparing CSV-like files through unio
 - A diff operation to get unique rows between files.
 - A match rows option which forces comparisons to be carried in a [specific useful way](#match-rows-explanation).
 
-## Installation and Usage
+## Installation and usage
 To install through command-line, use 
 ```
 python -m pip install csvuniondiff
@@ -57,6 +68,7 @@ options:
   --print-prepared      print the prepared df before comparison
   --save-file-extension SAVE_FILE_EXTENSION
                         the extension for output files (csv, xlsx, json, xml, or html)
+  -r, --row-counts      use the counts of each unique row in the final result instead
 ```
 
 1. 
@@ -116,14 +128,16 @@ options:
     column1 column2 column3 column4
     0  value1  value2  value3  value4
     ```
-2.
-    Look [here](#match-rows-explanation) for input files. \
+2. 
+    Look [here](#match-rows-explanation) for input files.
+   
     **Input**
     ```
     csvuniondiff
     --input-dir csvuniondiff/tests/test-data/diff/testset-1/ 
     --diff csv1.csv csv2.csv
     ```
+
     **Output**
     ```
     Timestamp: 2024-07-10 12:00:06.554911
@@ -159,7 +173,7 @@ options:
     ```
 
 ### Programming
-1.
+1. 
     **test1.csv**
     | Index | Name             | Age | Email                    |
     |-------|------------------|-----|--------------------------|
@@ -173,8 +187,8 @@ options:
     | 7     | Jessica Martinez | 27  | jessicamartinez@example.com|
     | 8     | Christopher Lee  | 33  | christopherlee@example.com|
     | 9     | Laura Taylor     | 29  | laurataylor@example.com  |
+    
     **test2.csv**
-
     | Index | Name             | Email                     | Age |
     |-------|------------------|---------------------------|-----|
     | 0     | John Doe         | johndoe25@example.com     | 25  |
@@ -227,6 +241,7 @@ options:
     left_df = left_dfs[0]
     right_df = right_dfs[0] # use the results somewhere
     ```
+
     **Output**
     ```
     Timestamp: 2024-07-11 11:37:38.748144
@@ -257,7 +272,6 @@ options:
             Name                      Email  Age
     7  Brian Harris  brianharris33@example.com   33
     ```
-
 2. 
     **Input**
     ```
@@ -286,6 +300,7 @@ options:
 
     only_in_test1, only_in_test2 = left_dfs[0], right_dfs[0] # Use the dataframe results somewhere
     ```
+
     **Output**
     ```
     Timestamp: 2024-07-10 13:23:35.239955
@@ -322,7 +337,33 @@ options:
     8      Emily Davis__1   27      emilydavis@example.com
     ```
 
-### Match rows explanation
+## Possible use cases
+### Command-line
+1.  
+    A personal usecase of mine is to **cross-check SQL results with an expected CSV/Excel file** (perhaps one that was created manually). 
+    I would use my SQL management tool to generate the CSV file from my query, then call ```csvuniondiff --diff my.csv expected.csv --match-rows``` 
+    to see the differences and the magnitude of the differences. I could also call ```csvuniondiff --union my.csv expected.csv --match-rows``` 
+    to see what rows my SQL query is getting right.
+2.  
+    You want to compare 2 CSV files but some aspect covered by this tool makes it impossible to (for example NULL values, unaligned columns, or you
+    want to only compare a subset of columns etc.) and you want to do it fast.
+
+### Programming
+1.  
+    I had a case where I needed to check for the existence of rows with certain values in specific columns across many Excel files. 
+    I can make a dataframe with the columns and values that I am looking for:
+    |    | Name            | Age | Email                     |
+    |----|-----------------|-----|---------------------------|
+    | 0  | John Doe        | 25  | johndoe@example.com       |
+
+    I can put all of the Excel files in a directory and then run the union command with the above CSV against 
+    the target CSV's in the directory.
+2.  
+    The files are slightly different but could be transformed to be compared.
+3.  
+    You don't want to personally code out difference and union operations with match rows and stdout output.
+
+## Match rows algorithm explanation
 To explain the match rows option, let's consider the following CSV tables:
 
 <table>

@@ -1,0 +1,51 @@
+original test1 and test2 were the same:
+
+from test2:
+    i removed
+        Isabella,30,Atlanta
+        Emily,32,Los Angeles
+        Evelyn,24,Charlotte
+
+    i added 
+        Brian,23,Dallas
+        Gordinsongton,22,Toronto
+    Emma,29,Seattle
+
+in test1:
+    i just repeated some rows so it is a superset of test2 
+    EXCEPT for (only test2 contains this)
+        Brian,23,Dallas 
+        Gordinsongton,22,Toronto
+
+intersection should contain:
+    0         John   25         New York
+    2      Michael   41          Chicago
+    3       Sophia   28   San Francisco
+    4       Daniel   35          Boston
+    5         Emma   29          Seattle
+    6         Emma   29          Seattle
+    7         Emma   29          Seattle
+    8         Emma   29          Seattle
+    9       Oliver   37          Houston
+    10        Emma   29          Seattle
+    11        Emma   29          Seattle
+    12        Emma   29          Seattle
+    13        Emma   29          Seattle
+    14         Ava   26           Miami
+    15     William   33          Dallas
+    17       James   27          Denver
+    18         Mia   34         Phoenix
+    19   Benjamin   31          Austin
+    20   Charlotte   38        Portland
+    21   Charlotte   38        Portland
+    22   Charlotte   38        Portland
+    23   Charlotte   38        Portland
+    24  Alexander   36       San Diego
+    25     Amelia   39       Nashville
+    26      Henry   40   Philadelphia
+    28      Jacob   42         Orlando
+    29     Harper   23  Washington D.C.
+    30     Harper   23  Washington D.C.
+    31     Harper   23  Washington D.C.
+    32     Harper   23  Washington D.C.
+    

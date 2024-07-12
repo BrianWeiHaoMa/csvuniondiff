@@ -10,10 +10,12 @@ from csvuniondiff.src.csvuniondiff import (
     change_inputs_to_dfs,
 )
 
+TEST_DATA_FOLDER_PATH = "tests/test-data/"
+
 
 class PublicFunctionsTest(TestCase):
     def test_change_inputs_to_dfs(self):
-        test_set_folder = "./tests/test-data/random/"
+        test_set_folder = f"{TEST_DATA_FOLDER_PATH}random/"
 
         tmp_df = pd.DataFrame({
             'A': [1, 2, 3, 4, 5],
@@ -84,7 +86,7 @@ class CommandOptionsTest(TestCase):
 
 
 class DiffTest(TestCase):
-    test_set_folder = f"./tests/test-data/diff/"
+    test_set_folder = f"{TEST_DATA_FOLDER_PATH}diff/"
 
     def test_match_rows_true(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1/", None)
@@ -145,6 +147,42 @@ class DiffTest(TestCase):
 
         self.assertTrue(left_df.equals(expected_left_df))
         self.assertTrue(right_df.equals(expected_right_df))
+
+    def test_match_rows_false_row_count(self):
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-1/", None)
+        parallel_input_args = ParallelInputArgs(
+            ["test1.csv"], 
+            ["test2.csv"], 
+        )
+        options = CommandOptions(
+            match_rows=False, 
+            enable_printing=False,
+            return_row_counts=True,
+        )
+        left_dfs, right_dfs = obj.diff(
+            parallel_input_args, 
+            options,
+        )
+
+        left_df = left_dfs[0]
+        right_df = right_dfs[0]
+
+        expected_left_df = pd.DataFrame({
+            'Name': ['Michael Wilson', 'Bob Thompson', 'Emily Davis'],
+            'Age': [32, 35, 27],
+            'Email': ['michaelwilson@example.com', 'bobthompson@example.com', 'emilydavis@example.com'],
+            'count': [3, 1, 1]
+        }, index=[0, 1, 2])
+
+        expected_right_df = pd.DataFrame({
+            'Name': ['Emily Davis__1', 'John Smith__1', 'Michael Johnson__1'],
+            'Age': [27, 35, 32],
+            'Email': ['emilydavis@example.com', 'johnsmith@example.com', 'michaeljohnson@example.com'],
+            'count': [1, 1, 1]
+        }, index=[0, 1, 2])
+
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
     
     def test_match_rows_true_transform(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-2/", None)
@@ -163,9 +201,12 @@ class DiffTest(TestCase):
             ["test2.csv"], 
             left_trans_funcs=[left_df_trans],
             right_trans_funcs=[lambda x: x],
-            return_transformed_rows=False,
         )
-        options = CommandOptions(match_rows=True, enable_printing=False)
+        options = CommandOptions(
+            match_rows=True, 
+            enable_printing=False,
+            return_transformed_rows=False,    
+        )
         left_dfs, right_dfs = obj.diff(
             parallel_input_args,
             options,
@@ -261,7 +302,7 @@ class DiffTest(TestCase):
 
 
 class UnionTest(TestCase):
-    test_set_folder = f"./tests/test-data/union/"
+    test_set_folder = f"{TEST_DATA_FOLDER_PATH}union/"
 
     def test_match_rows_true(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
@@ -353,9 +394,42 @@ class UnionTest(TestCase):
         self.assertTrue(left_df.equals(expected_left_df))
         self.assertTrue(right_df.equals(expected_right_df))
 
+    def test_keep_columns_row_counts(self):
+        obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
+        parallel_input_args = ParallelInputArgs(
+            ["test1.csv"], 
+            ["test2.csv"], 
+        )
+        options = CommandOptions(
+            match_rows=False, 
+            enable_printing=False,
+            keep_columns=["City"],
+            return_row_counts=True,
+        )
+        left_dfs, right_dfs = obj.union(
+            parallel_input_args,
+            options,
+        )
+
+        left_df = left_dfs[0]
+        right_df = right_dfs[0]
+
+        expected_left_df = pd.DataFrame({
+            'City': ['Seattle', 'Washington D.C.', 'Portland', 'Austin', 'Boston', 'Houston', 'Chicago', 'Dallas', 'Denver', 'New York', 'Nashville', 'Miami', 'Orlando', 'Phoenix', 'Philadelphia', 'San Francisco', 'San Diego'],
+            'count': [8, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        }, index=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+
+        expected_right_df = pd.DataFrame({
+            'City': ['Seattle', 'Austin', 'Boston', 'Dallas', 'Chicago', 'Houston', 'Miami', 'Nashville', 'Denver', 'New York', 'Orlando', 'Phoenix', 'Philadelphia', 'Portland', 'San Diego', 'San Francisco', 'Washington D.C.'],
+            'count': [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        }, index=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+
+        self.assertTrue(left_df.equals(expected_left_df))
+        self.assertTrue(right_df.equals(expected_right_df))
+
 
 class ParallelInputTest(TestCase):
-    test_set_folder = f"./tests/test-data/random/"
+    test_set_folder = f"{TEST_DATA_FOLDER_PATH}random/"
 
     def test_use_columns(self):
         obj = ParallelInput(

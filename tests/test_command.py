@@ -117,7 +117,7 @@ class CommandLineParserTest(TestCase):
 
         command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
         input_dir = command_line_parser.parse_input_dir()
-        self.assertEqual(input_dir, f"{os.sep}")
+        self.assertEqual(input_dir, None)
     
     def test_parse_output_dir(self):
         command_line_parser = CommandLineParser("--diff test1.csv test2.csv --output-dir test/".split())
@@ -194,3 +194,12 @@ class CommandLineParserTest(TestCase):
         command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
         save_file_extension = command_line_parser.parse_save_file_extension()
         self.assertEqual(save_file_extension, "csv")
+
+    def test_parse_row_counts(self):
+        command_line_parser = CommandLineParser("--diff test1.csv test2.csv --row-counts".split())
+        row_counts = command_line_parser.parse_row_counts()
+        self.assertEqual(row_counts, True)
+
+        command_line_parser = CommandLineParser("--diff test1.csv test2.csv".split())
+        row_counts = command_line_parser.parse_row_counts()
+        self.assertEqual(row_counts, False)

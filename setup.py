@@ -31,12 +31,7 @@ setup(
     python_requires='>=3.10',
     packages=find_packages(exclude=('tests')),
     install_requires=[
-        'numpy>=2.0.0',
-        'pandas>=2.2.2',
-        'python-dateutil>=2.9.0.post0',
-        'pytz>=2024.1',
-        'six>=1.16.0',
-        'tzdata>=2024.1',
+        'pandas>=2.2.2, <3.0.0',
     ],
 
     entry_points={
