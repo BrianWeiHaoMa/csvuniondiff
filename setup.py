@@ -1,18 +1,17 @@
-from csvuniondiff import __version__
 from setuptools import setup, find_packages
 
 setup(
     name='csvuniondiff',
-    version=__version__,    
+    version='0.1.5',    
 
     description='A package for comparing CSV-like files through union and difference operations.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
 
-    url='https://github.com/BrianWeiHaoMa/csvuniondiff',
-    author='Brian Ma',
+    author='Brian Wei Hao Ma',
     author_email='brianmaytc@gmail.com',
     license='MIT',
+    url='https://github.com/BrianWeiHaoMa/csvuniondiff',
     
     classifiers=[
         'Development Status :: 4 - Beta',

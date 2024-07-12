@@ -378,7 +378,7 @@ class CsvUnionDiff:
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
-        """Compare two sets of dataframes in parallel and return the rows that are only in the left and right dataframes.
+        """Compare pairs of tables and return the rows that are unique between the two, respectively.
         """
         LOGGER, data_save_dir_path = self._setup(
             options=options,
@@ -524,7 +524,7 @@ class CsvUnionDiff:
             args: ParallelInputArgs,
             options: CommandOptions = CommandOptions(),
         ) -> tuple[list[pd.DataFrame], list[pd.DataFrame]]: 
-        """Compare two sets of dataframes in parallel and return the rows that are in both the left and right dataframes.
+        """Compare pairs of tables and return the rows that are common between the two, respectively.
         """
         LOGGER, data_save_dir_path = self._setup(
             options=options,
