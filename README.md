@@ -201,7 +201,7 @@ options:
     | 7     | Brian Harris     | brianharris33@example.com | 33  |
 
     **Input**
-    ```
+    ```python
     import pandas as pd
     from csvuniondiff.csvuniondiff import (
         CsvUnionDiff,
@@ -274,7 +274,7 @@ options:
     ```
 2. 
     **Input**
-    ```
+    ```python
     from csvuniondiff.csvuniondiff import (
         CsvUnionDiff,
         ParallelInputArgs,
