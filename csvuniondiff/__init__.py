@@ -5,7 +5,7 @@ from .src.csvuniondiff import (
     change_inputs_to_dfs,
 )
 
-__version__ = '0.1.5'
+__version__ = '0.0.0dev0'
 __all__ = [
     'CsvUnionDiff',
     'CommandOptions',

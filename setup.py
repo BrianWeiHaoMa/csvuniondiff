@@ -3,7 +3,7 @@ from csvuniondiff import __version__
 
 setup(
     name='csvuniondiff',
-    version='0.1.5',    
+    version=__version__,    
 
     description='A package for comparing CSV-like files through union and difference operations.',
     long_description=open('README.md').read(),
