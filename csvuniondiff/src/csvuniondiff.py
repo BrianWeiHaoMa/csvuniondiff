@@ -22,8 +22,8 @@ def change_inputs_to_dfs(
     Args:
         first_input (list[str  |  pd.DataFrame]): A list of strings or dataframes.
         drop_null (bool, optional): Drop rows with null values. Defaults to False.
-        fill_null (str | None, optional): Fill rows with a string. Defaults to None which doesn't fill.
-        input_dir (str, optional): A directory path that will be appended to all file paths in the list. Defaults to os.getcwd().
+        fill_null (str | None, optional): Fill null values with a string. Defaults to None which doesn't fill.
+        input_dir (str, optional): A directory path that will be prepended to all file paths in the list. Defaults to os.getcwd().
 
     Raises:
         ValueError: Unsupported file extension.
@@ -89,7 +89,7 @@ class CommandOptions:
             ignore_columns: list[str] | None = None,
             fill_null: str | None = None,
             drop_null: bool = False,
-            match_rows: bool = True,
+            match_rows: bool = False,
             enable_printing: bool = True,
             add_save_timestamp: bool = False,
             drop_duplicates: bool = False,
@@ -103,15 +103,15 @@ class CommandOptions:
         """Options that are globally applicable CsvUnionDiff commands.
 
         drop_null (bool, optional): Drop rows with null values. Defaults to False.
-        fill_null (str | None, optional): Fill rows with a string. Defaults to None which doesn't fill.
+        fill_null (str | None, optional): Fill null values with a string. Defaults to None which doesn't fill.
 
         Args:
             align_columns (bool, optional): Align the maximal set of common columns sorted on the left. Defaults to False.
             use_columns (list[str] | None, optional): The columns to use for comparison. Defaults to None.
             ignore_columns (list[str] | None, optional): The columns to ignore for comparison. Defaults to None.
-            fill_null (str | None, optional): Fill rows with a string. Defaults to None.
+            fill_null (str | None, optional): Fill null values with a string. Defaults to None which doesn't fill.
             drop_null (bool, optional): Drop rows with null values. Defaults to False.
-            match_rows (bool, optional): Use the match rows algorithm. Defaults to True.
+            match_rows (bool, optional): Use the match rows algorithm. Defaults to False.
             enable_printing (bool, optional): Print to stdout. Defaults to True.
             add_save_timestamp (bool, optional): Add a timestamp subfolder for output files. Defaults to False.
             drop_duplicates (bool, optional): Drop duplicate rows. Defaults to False.
@@ -167,8 +167,7 @@ class ParallelInputArgs:
         data_save_file_extensions: list[str] = [],
     ):
         """Parallel input arguments for CsvUnionDiff commands where
-        the left and right input lists are compared in parallel. And a result list
-        of the same size as left_input and right_input is returned.
+        the left and right input lists are compared in parallel.
 
         Args:
             left_input (list[str  |  pd.DataFrame]): A list of strings or dataframes to be compared with. The strings should be file paths to files with extensions csv, xlsx, json, xml, or html.

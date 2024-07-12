@@ -57,7 +57,7 @@ class CommandLineParser:
             cnt += 1
         
         if cnt != 1:
-            raise ValueError("Please provide only one command")
+            raise ValueError("Please provide exactly one command")
     
     def check_for_one_or_no_use_columns(self):
         if self.args.use_common_columns and self.args.use_columns is not None:
@@ -161,14 +161,6 @@ def main():
     print_prepared = command_line_parser.parse_print_prepared()
     save_file_extension = command_line_parser.parse_save_file_extension()
     row_counts = command_line_parser.parse_row_counts()
-
-    commands_count = 0
-    if diff is not None:
-        commands_count += 1
-    if union is not None:
-        commands_count += 1
-    if commands_count != 1:
-        raise ValueError("Please provide exactly one command")
 
     if input_dir is None:
         input_dir = f".{os.sep}"

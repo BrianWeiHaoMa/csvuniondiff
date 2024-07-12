@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from csvuniondiff import __version__
 
 setup(
     name='csvuniondiff',
@@ -35,7 +36,7 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'csvuniondiff = csvuniondiff.command:main',
+            'csvuniondiff = csvuniondiff.src.command:main',
         ],
     },
 )
