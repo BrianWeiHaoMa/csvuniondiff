@@ -457,3 +457,7 @@ in your CSV when compared against an expected CSV. In this case, you can use
 ```csvuniondiff --diff my.csv expected.csv --match-rows``` to get the rows with duplicates or
  ```csvuniondiff --diff my.csv expected.csv --match-rows --row-counts``` to 
 get the count of each unique row in the result.
+
+## Contribution
+Feel free to open an issue if something isn't working properly or you think that another feature would be
+worth it to add. 
