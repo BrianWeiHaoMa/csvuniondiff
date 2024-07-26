@@ -11,13 +11,14 @@ CSVUnionDiff is an open-source library for comparing CSV-like files through unio
     - [Command-line](#command-line-1)
     - [Programming](#programming-1)
   - [Match rows algorithm explanation](#match-rows-algorithm-explanation)
+  - [Contribution](#contribution)
 
 ## Features
 - A convenient command-line tool for quickly comparing files.
 - A robust python package for comparing files in a programmatic way.
 - A union operation to get the common rows between files.
 - A diff operation to get unique rows between files.
-- A match rows option which forces comparisons to be carried in a [specific useful way](#match-rows-explanation).
+- A match rows option which forces comparisons to be carried in a [specific useful way](#match-rows-algorithm-explanation).
 - Incorporates pandas to allow for various input and output types (csv, xlsx, json, xml, or html) and integration with dataframes.
 
 ## Installation and usage
@@ -129,7 +130,7 @@ options:
     0  value1  value2  value3  value4
     ```
 2. 
-    Look [here](#match-rows-explanation) for input files.
+    Look [here](#match-rows-algorithm-explanation) for input files.
    
     **Input**
     ```

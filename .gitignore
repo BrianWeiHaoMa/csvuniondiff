@@ -17,3 +17,5 @@ csvcmp.egg-info
 /build
 /csvuniondiff.egg-info
 /.test_venv
+.benchmarks
+.pytest_cache

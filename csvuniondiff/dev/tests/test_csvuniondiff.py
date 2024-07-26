@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import pandas as pd
+import pytest
 
 from csvuniondiff.src.csvuniondiff import (
     CsvUnionDiff, 
@@ -10,10 +11,10 @@ from csvuniondiff.src.csvuniondiff import (
     change_inputs_to_dfs,
 )
 
-TEST_DATA_FOLDER_PATH = "tests/test-data/"
+TEST_DATA_FOLDER_PATH = "csvuniondiff/dev/tests/test-data/"
 
 
-class PublicFunctionsTest(TestCase):
+class TestPublicFunctions:
     def test_change_inputs_to_dfs(self):
         test_set_folder = f"{TEST_DATA_FOLDER_PATH}random/"
 
@@ -36,10 +37,10 @@ class PublicFunctionsTest(TestCase):
             input_dir=test_set_folder,
         )
 
-        self.assertTrue(test1_df.equals(first_dfs[0]))
-        self.assertTrue(test2_df.equals(second_dfs[0]))
-        self.assertTrue(test3_df.equals(third_dfs[0]))
-        self.assertTrue(tmp_df.equals(third_dfs[1]))
+        assert test1_df.equals(first_dfs[0])
+        assert test2_df.equals(second_dfs[0])
+        assert test3_df.equals(third_dfs[0])
+        assert tmp_df.equals(third_dfs[1])
         
         test4_df = pd.read_csv(f"{test_set_folder}test4.csv")
         test4_df_nulls_filled = test4_df.fillna("NULL")
@@ -50,7 +51,7 @@ class PublicFunctionsTest(TestCase):
             fill_null="NULL",
         )
 
-        self.assertTrue(test4_df_nulls_filled.equals(fourth_dfs[0]))
+        assert test4_df_nulls_filled.equals(fourth_dfs[0])
 
         test4_df = pd.read_csv(f"{test_set_folder}test4.csv")
         test4_df_nulls_dropped = test4_df.dropna()
@@ -61,31 +62,31 @@ class PublicFunctionsTest(TestCase):
             drop_null=True,
         )
 
-        self.assertTrue(test4_df_nulls_dropped.equals(fourth_dfs[0]))
+        assert test4_df_nulls_dropped.equals(fourth_dfs[0])
 
 
-class CommandOptionsTest(TestCase):
+class TestCommandOptions:
     def test_check_args(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             CommandOptions(
                 use_columns=["column3", "column4"],
                 ignore_columns=["column3"],
             )
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             CommandOptions(
                 use_common_columns=True, 
                 use_columns=["column3", "column4"],
             )
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             CommandOptions(
                 use_common_columns=True, 
                 ignore_columns=["column3"],
             )
 
 
-class DiffTest(TestCase):
+class TestDiff:
     test_set_folder = f"{TEST_DATA_FOLDER_PATH}diff/"
 
     def test_match_rows_true(self):
@@ -115,8 +116,8 @@ class DiffTest(TestCase):
             'Email': ['johndoe@example.com', 'janesmith@example.com', 'johnsmith@example.com', 'michaeljohnson@example.com', 'emilydavis@example.com']
         }, index=[1, 3, 6, 7, 8])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
         
     def test_match_rows_false(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1/", None)
@@ -145,8 +146,8 @@ class DiffTest(TestCase):
             'Email': ['johnsmith@example.com', 'michaeljohnson@example.com', 'emilydavis@example.com']
         }, index=[6, 7, 8])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
 
     def test_match_rows_false_row_count(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1/", None)
@@ -181,8 +182,8 @@ class DiffTest(TestCase):
             'count': [1, 1, 1]
         }, index=[0, 1, 2])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
     
     def test_match_rows_true_transform(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-2/", None)
@@ -227,8 +228,8 @@ class DiffTest(TestCase):
             'Age': [33],
         }, index=[7])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
 
     def test_match_rows_true_align_columns(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-4/", None)
@@ -263,8 +264,8 @@ class DiffTest(TestCase):
             'tmp': [0] * 5,
         }, index=[1, 3, 6, 7, 8])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
 
     def test_keep_columns(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-4/", None)
@@ -297,11 +298,11 @@ class DiffTest(TestCase):
             'Age': [25, 30, 35, 32, 27],
         }, index=[1, 3, 6, 7, 8])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
 
 
-class UnionTest(TestCase):
+class TestUnion:
     test_set_folder = f"{TEST_DATA_FOLDER_PATH}union/"
 
     def test_match_rows_true(self):
@@ -331,8 +332,8 @@ class UnionTest(TestCase):
             'City': ['New York', 'Chicago', 'San Francisco', 'Boston', 'Seattle', 'Seattle', 'Houston', 'Miami', 'Dallas', 'Denver', 'Phoenix', 'Austin', 'Portland', 'San Diego', 'Nashville', 'Philadelphia', 'Orlando', 'Washington D.C.']
         }, index=[0, 1, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
 
     def test_match_rows_false(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
@@ -361,8 +362,8 @@ class UnionTest(TestCase):
             'City': ['New York', 'Chicago', 'San Francisco', 'Boston', 'Seattle', 'Seattle', 'Houston', 'Miami', 'Dallas', 'Denver', 'Phoenix', 'Austin', 'Portland', 'San Diego', 'Nashville', 'Philadelphia', 'Orlando', 'Washington D.C.']
         }, index=[0, 1, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
     
     def test_keep_columns(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
@@ -391,8 +392,8 @@ class UnionTest(TestCase):
             'City': ['New York', 'Chicago', 'San Francisco', 'Boston', 'Seattle', 'Seattle', 'Houston', 'Miami', 'Dallas', 'Denver', 'Phoenix', 'Austin', 'Portland', 'San Diego', 'Nashville', 'Philadelphia', 'Orlando', 'Washington D.C.']
         }, index=[0, 1, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
 
     def test_keep_columns_row_counts(self):
         obj = CsvUnionDiff(f"{self.test_set_folder}testset-1", None)
@@ -424,11 +425,11 @@ class UnionTest(TestCase):
             'count': [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         }, index=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
 
-        self.assertTrue(left_df.equals(expected_left_df))
-        self.assertTrue(right_df.equals(expected_right_df))
+        assert left_df.equals(expected_left_df)
+        assert right_df.equals(expected_right_df)
 
 
-class ParallelInputTest(TestCase):
+class TestParallelInput:
     test_set_folder = f"{TEST_DATA_FOLDER_PATH}random/"
 
     def test_use_columns(self):
@@ -442,7 +443,7 @@ class ParallelInputTest(TestCase):
         )
 
         for p_data in obj:
-            self.assertTrue(p_data.columns_to_use.equals(pd.Index(["column3", "column4"])))
+            assert p_data.columns_to_use.equals(pd.Index(["column3", "column4"]))
 
     def test_ignore_columns(self):
         obj = ParallelInput(
@@ -455,10 +456,10 @@ class ParallelInputTest(TestCase):
         )    
 
         for p_data in obj:
-            self.assertTrue(p_data.columns_to_use.equals(pd.Index(["column1", "column2", "column5"])))
+            assert p_data.columns_to_use.equals(pd.Index(["column1", "column2", "column5"]))
 
     def test_use_columns_and_ignore(self):
-         with self.assertRaises(ValueError):
+         with pytest.raises(ValueError):
              CommandOptions(use_columns=["column3", "column4"], ignore_columns=["column3"])
 
     def test_align_columns(self):
@@ -471,7 +472,7 @@ class ParallelInputTest(TestCase):
             options=CommandOptions(align_columns=True),
         )
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             for p_data in obj:
                 pass
 
@@ -485,6 +486,6 @@ class ParallelInputTest(TestCase):
         )
 
         for p_data in obj:
-            self.assertTrue(p_data.columns_to_use.equals(pd.Index(["column1", "column2", "column3", "column4"])))
-            self.assertTrue(p_data.left_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4", "column7", "column5", "column6"])))
-            self.assertTrue(p_data.right_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4"])))
+            assert p_data.columns_to_use.equals(pd.Index(["column1", "column2", "column3", "column4"]))
+            assert p_data.left_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4", "column7", "column5", "column6"]))
+            assert p_data.right_df.columns.equals(pd.Index(["column1", "column2", "column3", "column4"]))
